@@ -29,8 +29,8 @@ function RoutesContent() {
   const router = useRouter();
 
   // Read URL query parameters
-  const initialSource = searchParams.get('source') || 'Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)';
-  const initialDestination = searchParams.get('destination') || 'Guindy';
+  const initialSource = searchParams.get('source') || 'Central Dental College';
+  const initialDestination = searchParams.get('destination') || 'Guindy B.T';
   const initialGender = (searchParams.get('gender') as Gender) || 'male';
   const initialSort = (searchParams.get('sort') as SortPreference) || 'cost';
 
@@ -46,6 +46,10 @@ function RoutesContent() {
   const [sortBy, setSortBy] = useState<SortPreference>(initialSort);
 
   const [routes, setRoutes] = useState<MultimodalRoute[]>([]);
+  const [backendMessage, setBackendMessage] = useState<string | null>(null);
+  const [originTaz, setOriginTaz] = useState<string | null>(null);
+  const [destTaz, setDestTaz] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBackendHealthy, setIsBackendHealthy] = useState<boolean | null>(null);
@@ -65,7 +69,7 @@ function RoutesContent() {
     });
   }, []);
 
-  // Fetch routes from FastAPI backend
+  // Fetch routes from FastAPI backend with strict no-mock policy
   const loadRoutes = useCallback(
     async (
       src: string,
@@ -77,8 +81,9 @@ function RoutesContent() {
     ) => {
       setIsLoading(true);
       setError(null);
+      setBackendMessage(null);
       try {
-        const results = await searchRoutesApi({
+        const result = await searchRoutesApi({
           source: src,
           destination: dst,
           sourceCoords: srcC,
@@ -86,10 +91,14 @@ function RoutesContent() {
           gender: g,
           sortBy: sort,
         });
-        setRoutes(results);
+        setRoutes(result.routes);
+        setBackendMessage(result.message || null);
+        setOriginTaz(result.originTaz || null);
+        setDestTaz(result.destTaz || null);
       } catch (err: any) {
         console.error('Failed to load routes from backend:', err);
         setError(err.message || 'Unable to connect to transit routing engine');
+        setRoutes([]);
       } finally {
         setIsLoading(false);
       }
@@ -164,13 +173,13 @@ function RoutesContent() {
                   isBackendHealthy ? 'bg-emerald-600' : 'bg-amber-600'
                 }`}
               />
-              {isBackendHealthy ? 'FastAPI Connected' : 'Connecting to API'}
+              {isBackendHealthy ? 'Theme7 Engine Active' : 'Connecting to API'}
             </span>
           )}
 
           <div className="text-[11px] font-semibold text-brand-900 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 flex items-center gap-1.5">
             <Compass size={13} className="text-brand-700" />
-            <span>Chennai Multimodal Engine</span>
+            <span>Theme7 Strict Dataset</span>
           </div>
         </div>
       </div>
@@ -233,7 +242,7 @@ function RoutesContent() {
           <div className="flex items-center gap-2 text-slate-600">
             <SlidersHorizontal size={14} className="text-slate-400" />
             <span>
-              Showing <span className="font-bold text-slate-900">{routes.length}</span> multimodal options sorted by{' '}
+              Showing <span className="font-bold text-slate-900">{routes.length}</span> connected options sorted by{' '}
               <span className="font-bold text-brand-900">{sortBy === 'cost' ? 'Lowest Cost (₹)' : 'Least Time (mins)'}</span>.
             </span>
           </div>
@@ -241,12 +250,12 @@ function RoutesContent() {
           {gender === 'female' ? (
             <div className="inline-flex items-center gap-1.5 text-brand-900 bg-rose-50 px-3 py-1 rounded-lg border border-rose-200 font-semibold text-[11px]">
               <Sparkles size={13} className="text-brand-600" />
-              <span>Vidiyal Payana Thittam Active: Ordinary MTC Buses are ₹0</span>
+              <span>Vidiyal Payana Thittam Active: MTC Ordinary Buses are ₹0</span>
             </div>
           ) : (
             <div className="inline-flex items-center gap-1.5 text-slate-500 text-[11px]">
               <Info size={13} className="text-slate-400" />
-              <span>Standard MTC stage fares applied for male commuters</span>
+              <span>Standard statutory stage fares applied for male commuters</span>
             </div>
           )}
         </div>
@@ -257,17 +266,17 @@ function RoutesContent() {
         {/* Results Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <span>Viable Chennai Routes</span>
+            <span>Viable Transit Routes</span>
             <span className="text-xs font-normal text-slate-500">
-              (Click any card to expand step-by-step breakdown)
+              (Theme7 Public Transport Network)
             </span>
           </h2>
 
           <div className="text-xs text-slate-500 hidden sm:flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Verified Official Fare</span>
+            <span>Official Government Fare</span>
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ml-2" />
-            <span>Calibrated Estimate</span>
+            <span>Derived / Estimated Transfer</span>
           </div>
         </div>
 
@@ -300,9 +309,12 @@ function RoutesContent() {
           <EmptyState
             source={source}
             destination={destination}
+            message={backendMessage}
+            originTaz={originTaz}
+            destTaz={destTaz}
             onReset={() => {
-              setSource('Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)');
-              setDestination('Guindy');
+              setSource('Central Dental College');
+              setDestination('Guindy B.T');
             }}
           />
         ) : (
@@ -322,13 +334,13 @@ function RoutesContent() {
         <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/80 text-xs text-slate-600 space-y-2 mt-10">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <ShieldCheck size={16} className="text-brand-800" />
-            <span>Chennai Transit Transparency & Rate Verification Notice</span>
+            <span>Theme7 Strict Data Policy Notice</span>
           </div>
           <p className="leading-relaxed text-slate-500">
-            • <strong>Verified Fares:</strong> Suburban train fares are calculated using official Indian Railways unreserved 2nd class distance slabs. CMRL fares are based on Chennai Metro Rail published distance slabs (with QR discount factor). MTC Bus fares correspond to Tamil Nadu State Transport ordinary and deluxe stage charts.
+            • <strong>Supported Modes:</strong> Only Walking, MTC Bus, Chennai Metro Rail, and Southern Railway Suburban tracks are supported. Intermediate auto rickshaw, share auto, and taxi estimates are strictly excluded in accordance with the pure Theme7 transit model.
           </p>
           <p className="leading-relaxed text-slate-500">
-            • <strong>Calibrated Estimates:</strong> Chennai auto rickshaws, share autos, and cab fares represent calibrated daytime market averages and are labeled accordingly. Real-time driver negotiations, wait times, or ride-hailing surge rates may vary.
+            • <strong>Route Verification & Station Provenance:</strong> MTC routes reflect actual lines traced from <code className="font-mono text-slate-700">routes_merged.shp</code>. Station names are preserved exactly as provided in the dataset without fabricated identifiers.
           </p>
         </div>
       </div>

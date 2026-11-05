@@ -20,16 +20,16 @@ import { SortToggle } from '@/components/SortToggle';
 export function SearchForm() {
   const router = useRouter();
 
-  const [source, setSource] = useState('Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)');
+  const [source, setSource] = useState('Central Dental College');
   const [sourceCoords, setSourceCoords] = useState<{ lat: number; lng: number } | null>({
-    lat: 13.0827,
-    lng: 80.2755,
+    lat: 13.0828,
+    lng: 80.2822,
   });
 
-  const [destination, setDestination] = useState('Guindy');
+  const [destination, setDestination] = useState('Guindy B.T');
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>({
-    lat: 13.0067,
-    lng: 80.2128,
+    lat: 13.0092,
+    lng: 80.2108,
   });
 
   const [gender, setGender] = useState<Gender>('male');
@@ -114,11 +114,21 @@ export function SearchForm() {
     router.push(`/routes?${params.toString()}`);
   };
 
-  const selectPopularRoute = (src: string, dst: string) => {
+  const selectPopularRoute = async (src: string, dst: string) => {
     setSource(src);
     setDestination(dst);
-    if (src.includes('Central')) setSourceCoords({ lat: 13.0827, lng: 80.2755 });
-    if (dst.includes('Guindy')) setDestCoords({ lat: 13.0067, lng: 80.2128 });
+    try {
+      const p1 = await fetchPlaces(src, 1);
+      if (p1.length > 0 && typeof p1[0].lat === 'number' && typeof p1[0].lng === 'number') {
+        setSourceCoords({ lat: p1[0].lat, lng: p1[0].lng });
+      }
+      const p2 = await fetchPlaces(dst, 1);
+      if (p2.length > 0 && typeof p2[0].lat === 'number' && typeof p2[0].lng === 'number') {
+        setDestCoords({ lat: p2[0].lat, lng: p2[0].lng });
+      }
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -155,7 +165,7 @@ export function SearchForm() {
                     const places = await fetchPlaces(source || '', 8);
                     setSourceSuggestions(places);
                   }}
-                  placeholder="Search Chennai stops, stations, or areas"
+                  placeholder="Search Theme7 stops, stations, or areas"
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 text-sm font-medium rounded-2xl border border-slate-200/90 focus:border-brand-600 focus:ring-4 focus:ring-brand-500/10 transition-all outline-none"
                 />
@@ -170,8 +180,8 @@ export function SearchForm() {
               {activeInput === 'source' && sourceSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-soft-xl border border-rose-100/90 z-30 max-h-64 overflow-y-auto p-2">
                   <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider flex items-center justify-between">
-                    <span>Chennai Places & Transit Stops</span>
-                    <span className="text-[10px] text-emerald-600 font-normal">Theme7 Verified</span>
+                    <span>Theme7 Places & Transit Stops</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">Official GIS</span>
                   </div>
                   {sourceSuggestions.map((loc) => (
                     <button
@@ -210,7 +220,7 @@ export function SearchForm() {
                 type="button"
                 onClick={swapLocations}
                 title="Swap origin and destination"
-                className="w-10 h-10 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-brand-800 flex items-center justify-center transition-all hover:rotate-180 duration-300 shadow-sm"
+                className="w-10 h-10 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-brand-900 flex items-center justify-center transition-all hover:rotate-180 duration-300 shadow-sm"
               >
                 <ArrowUpDown size={16} />
               </button>
@@ -238,7 +248,7 @@ export function SearchForm() {
                     const places = await fetchPlaces(destination || '', 8);
                     setDestSuggestions(places);
                   }}
-                  placeholder="Search Chennai stops, stations, or areas"
+                  placeholder="Search Theme7 stops, stations, or areas"
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 text-sm font-medium rounded-2xl border border-slate-200/90 focus:border-brand-600 focus:ring-4 focus:ring-brand-500/10 transition-all outline-none"
                 />
@@ -253,8 +263,8 @@ export function SearchForm() {
               {activeInput === 'destination' && destSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-soft-xl border border-rose-100/90 z-30 max-h-64 overflow-y-auto p-2">
                   <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider flex items-center justify-between">
-                    <span>Chennai Places & Transit Stops</span>
-                    <span className="text-[10px] text-emerald-600 font-normal">Theme7 Verified</span>
+                    <span>Theme7 Places & Transit Stops</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">Official GIS</span>
                   </div>
                   {destSuggestions.map((loc) => (
                     <button
@@ -301,7 +311,7 @@ export function SearchForm() {
               className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-900 via-brand-800 to-rose-700 hover:from-brand-950 hover:to-brand-800 text-white font-bold text-base shadow-soft-lg hover:shadow-soft-xl transition-all duration-200 flex items-center justify-center gap-2.5 group"
             >
               <Search size={20} className="group-hover:scale-110 transition-transform" />
-              <span>Search Multimodal Routes</span>
+              <span>Search Transit Routes</span>
               <Compass size={18} className="text-rose-300 opacity-80" />
             </button>
           </div>
@@ -312,7 +322,7 @@ export function SearchForm() {
       <div className="mt-6 flex flex-wrap items-center gap-2 justify-center">
         <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
           <Sparkles size={12} className="text-brand-600" />
-          Popular Chennai Corridors:
+          Verified Corridors:
         </span>
         {POPULAR_ROUTES.map((route, idx) => (
           <button
@@ -321,7 +331,7 @@ export function SearchForm() {
             onClick={() => selectPopularRoute(route.source, route.destination)}
             className="text-xs font-medium bg-white/80 hover:bg-rose-50 border border-rose-100/80 hover:border-brand-200 text-slate-700 hover:text-brand-900 px-3 py-1.5 rounded-full transition-all shadow-sm"
           >
-            {route.source.split(' ')[0]} ➔ {route.destination.split(' ')[0]}
+            {route.source} ➔ {route.destination}
           </button>
         ))}
       </div>

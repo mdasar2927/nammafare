@@ -2,10 +2,7 @@ export type TransitMode =
   | 'walking'
   | 'mtc_bus'
   | 'metro'
-  | 'suburban_train'
-  | 'auto'
-  | 'share_auto'
-  | 'taxi';
+  | 'suburban_train';
 
 export type Gender = 'male' | 'female';
 
@@ -23,11 +20,14 @@ export interface RouteLeg {
   fare: number;               // Current calculated fare
   baseFareMale: number;       // Original male fare
   fareType: FareType;
-  routeNumber?: string;       // e.g. "18A", "21G", "570"
-  serviceType?: string;       // e.g. "Ordinary (White Board)", "Deluxe", "Blue Line", "Southern Railway 2nd Class"
+  isVerified: boolean;
+  provenance?: string;
+  routeNumber?: string;       // Actual Theme7 MTC route e.g. "18A", "9MET", "21G"
+  serviceType?: string;       // e.g. "Ordinary (White Board)", "Express", "CMRL Metro", "Southern Railway 2nd Class"
   isVidiyalEligible?: boolean;// Eligible for ₹0 fare for women
   fareNote?: string;
   instructions?: string;
+  polyline?: number[][];
 }
 
 export interface MultimodalRoute {
@@ -41,6 +41,8 @@ export interface MultimodalRoute {
   legs: RouteLeg[];
   calculatedTotalFare: number;
   hasVerifiedFaresOnly: boolean;
+  isVerified: boolean;
+  provenance?: string;
   highlightBadge?: 'Cheapest' | 'Fastest' | 'Balanced';
 }
 
@@ -53,6 +55,7 @@ export interface ChennaiLocation {
   lat?: number;
   lng?: number;
   category?: string;
+  source?: string;
   description?: string;
 }
 
@@ -77,6 +80,8 @@ export interface BackendRouteLeg {
   fare: number;
   fare_note?: string | null;
   is_estimated: boolean;
+  is_verified: boolean;
+  provenance?: string | null;
   polyline?: number[][] | null;
 }
 
@@ -91,6 +96,8 @@ export interface BackendRouteOption {
   arrival_time: string;
   is_cheapest: boolean;
   is_fastest: boolean;
+  is_verified: boolean;
+  provenance?: string | null;
   legs: BackendRouteLeg[];
 }
 
@@ -100,5 +107,8 @@ export interface BackendSearchResponse {
   destination: string;
   departure_time: string;
   gender: string;
+  origin_taz?: string | null;
+  destination_taz?: string | null;
+  message?: string | null;
   routes: BackendRouteOption[];
 }

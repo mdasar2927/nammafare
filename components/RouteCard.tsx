@@ -10,11 +10,11 @@ import {
   Clock,
   IndianRupee,
   ShieldCheck,
-  HelpCircle,
   Sparkles,
   ArrowRight,
   TrendingDown,
   Zap,
+  Database,
 } from 'lucide-react';
 
 interface RouteCardProps {
@@ -35,8 +35,8 @@ export function RouteCard({
     currentGender === 'female' &&
     route.legs.some((l) => l.isVidiyalEligible);
 
-  // Verified vs Estimated status
-  const allVerified = route.hasVerifiedFaresOnly;
+  // Check verified status
+  const isRouteVerified = route.isVerified || route.hasVerifiedFaresOnly;
 
   return (
     <div
@@ -46,9 +46,9 @@ export function RouteCard({
           : 'border-rose-100/90 shadow-soft-sm hover:shadow-soft-md hover:border-brand-300'
       }`}
     >
-      {/* Top Banner (Optional Highlight) */}
+      {/* Top Banner */}
       <div className="flex items-center justify-between px-6 pt-4 pb-2 border-b border-slate-100 bg-gradient-to-r from-rose-50/40 via-white to-transparent">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {route.highlightBadge === 'Cheapest' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
               <TrendingDown size={13} />
@@ -68,15 +68,21 @@ export function RouteCard({
             </span>
           )}
 
-          {allVerified ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+          {isRouteVerified ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
               <ShieldCheck size={12} />
-              100% Verified Official Fares
+              Official Government Fare
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-              <HelpCircle size={12} />
-              Includes Calibrated Estimates
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200">
+              Derived Transit Route
+            </span>
+          )}
+
+          {route.provenance && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+              <Database size={10} />
+              Theme7 Network
             </span>
           )}
         </div>
@@ -84,7 +90,7 @@ export function RouteCard({
         {hasVidiyalBenefit && (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-900 bg-rose-100/80 px-2.5 py-0.5 rounded-full border border-brand-200 animate-pulse">
             <Sparkles size={12} className="text-brand-600" />
-            Vidiyal Scheme Applied (₹0 MTC)
+            Vidiyal Scheme (₹0 MTC)
           </span>
         )}
       </div>
@@ -122,7 +128,7 @@ export function RouteCard({
                   >
                     <TransitIcon mode={leg.mode} size={14} />
                     <span>
-                      {leg.routeNumber || details.label}
+                      {leg.routeNumber ? `Route ${leg.routeNumber}` : details.label}
                     </span>
                     <span className="text-[10px] opacity-75 font-normal">
                       ({leg.durationMinutes}m)
@@ -175,7 +181,7 @@ export function RouteCard({
         <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50/30">
           <div className="flex items-center justify-between mb-4">
             <span className="text-xs font-bold text-slate-700 tracking-wider uppercase">
-              Step-by-Step Itinerary & Fare Breakdown
+              Step-by-Step Itinerary & Data Provenance
             </span>
             <span className="text-xs text-slate-500">
               Click to collapse
@@ -193,16 +199,16 @@ export function RouteCard({
             ))}
           </div>
 
-          {/* Disclaimers & Notes */}
+          {/* Disclaimers & Provenance Box */}
           <div className="mt-4 p-3 rounded-xl bg-white border border-rose-100 text-[11px] text-slate-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
               <span>
-                Verified government transit fares reflect official Southern Railway, CMRL, and MTC Chennai rate charts.
+                Derived from official Chennai Theme7 GIS datasets. Stop names & station codes are preserved without fabrication.
               </span>
             </div>
             <span className="text-[10px] text-slate-400 font-mono">
-              ID: {route.id}
+              Route ID: {route.id}
             </span>
           </div>
         </div>

@@ -9,11 +9,11 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-2 font-bold text-slate-900 text-sm">
               <Bus size={16} className="text-brand-800" />
-              <span>NammaFare Chennai Engine</span>
+              <span>Theme7 Chennai Transit Engine</span>
             </div>
             <p className="text-slate-500 leading-relaxed">
-              Tailored specifically for Chennai commuters, integrating MTC Buses, Chennai Metro (CMRL),
-              Southern Railway Suburban network, Auto Rickshaws, Share Autos, and Taxis into unified itineraries.
+              Spatial journey planner driven strictly by official Chennai Theme7 GIS datasets,
+              integrating MTC Bus routes, Chennai Metro corridors, and Southern Railway suburban networks.
             </p>
           </div>
 
@@ -31,21 +31,21 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-2 font-bold text-slate-900 text-sm">
               <Info size={16} className="text-sky-600" />
-              <span>Verified vs Estimated Data</span>
+              <span>Strict Data Integrity Policy</span>
             </div>
             <p className="text-slate-500 leading-relaxed">
-              Government-published transit fares (Metro, Suburban Trains, MTC Buses) are verified official rates.
-              Auto rickshaws, share autos, and taxis display indicative street & daytime calibrated averages.
+              All routes and station stops are traced directly from official shapefiles and verified fare structures.
+              Disconnected locations report honest empty states without simulated intermediate connections.
             </p>
           </div>
         </div>
 
         <div className="pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} NammaFare. Designed with pride for Chennai commuters.</p>
+          <p>© {new Date().getFullYear()} NammaFare. Built with Chennai Theme7 Transit GIS Data.</p>
           <div className="flex items-center gap-4 text-slate-500">
             <span>MTC Chennai</span>
             <span>•</span>
-            <span>CMRL Metro</span>
+            <span>Chennai Metro (CMRL)</span>
             <span>•</span>
             <span>Southern Railway</span>
           </div>

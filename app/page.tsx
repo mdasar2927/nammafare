@@ -5,10 +5,9 @@ import {
   Bus,
   Sparkles,
   ShieldCheck,
-  Compass,
   Zap,
   TrendingDown,
-  Clock,
+  Footprints,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -25,22 +24,22 @@ export default function HomePage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-brand-900 text-xs font-semibold mb-6 shadow-soft-sm">
             <Sparkles size={14} className="text-brand-600" />
-            <span>Dedicated Chennai Multimodal Transit Engine</span>
+            <span>Theme7 Verified Chennai Transit Datasets</span>
           </div>
 
           {/* Heading */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-5">
-            Compare Every Route in{' '}
+            Compare Public Transit in{' '}
             <span className="bg-gradient-to-r from-brand-900 via-brand-700 to-rose-600 bg-clip-text text-transparent">
               Chennai
             </span>
-            . Save Time & Fare.
+            . Real Data & Fares.
           </h1>
 
           <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            Discover verified fares across <span className="font-semibold text-slate-800">MTC Buses</span>,{' '}
-            <span className="font-semibold text-slate-800">CMRL Metro</span>, and{' '}
-            <span className="font-semibold text-slate-800">Suburban Trains</span> alongside calibrated Auto, Share Auto, and Cab estimates.
+            Find connected routes across <span className="font-semibold text-slate-800">MTC Buses</span>,{' '}
+            <span className="font-semibold text-slate-800">Chennai Metro (CMRL)</span>, and{' '}
+            <span className="font-semibold text-slate-800">Suburban Railway</span> with official stage fares and statutory women free travel rules.
           </p>
         </div>
 
@@ -60,7 +59,7 @@ export default function HomePage() {
               Vidiyal Payana Thittam
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Standard MTC Ordinary (White-Board) bus fares are automatically calculated as ₹0 for women commuters.
+              Standard MTC Ordinary (White-Board) bus fares are automatically calculated as ₹0 for women commuters under Tamil Nadu statutory scheme.
             </p>
           </div>
 
@@ -73,7 +72,7 @@ export default function HomePage() {
               Lowest Cost vs Least Time
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Compare ₹5 Suburban train options with rapid CMRL Metro lines or door-to-door auto/cab connections instantly.
+              Dynamically compare economical Suburban train options with rapid CMRL Metro lines or direct MTC corridors.
             </p>
           </div>
 
@@ -83,10 +82,10 @@ export default function HomePage() {
               <ShieldCheck size={24} className="text-emerald-700" />
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-1">
-              Transparent Fare Breakdowns
+              Pure Theme7 Spatial Data
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Every leg is transparently labeled as government-verified or calibrated street estimate with step-by-step guidance.
+              Every route leg is traced from official GIS shapefiles with exact route identifiers and genuine data provenance.
             </p>
           </div>
         </div>
@@ -94,20 +93,20 @@ export default function HomePage() {
         {/* Transit Modes Supported Row */}
         <div className="mt-14 pt-8 border-t border-rose-100/70 text-center">
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
-            Unified Chennai Multimodal Network
+            Supported Public Transit Network
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-semibold text-slate-700">
             <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Bus size={15} className="text-orange-600" /> MTC Ordinary & Deluxe
+              <Bus size={15} className="text-orange-600" /> MTC Bus Network
             </span>
             <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Train size={15} className="text-sky-600" /> CMRL Metro Blue & Green
+              <Train size={15} className="text-sky-600" /> Chennai Metro Rail
             </span>
             <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Zap size={15} className="text-indigo-600" /> Southern Railway Suburban
+              <Zap size={15} className="text-indigo-600" /> Suburban Rail
             </span>
             <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Compass size={15} className="text-amber-600" /> Chennai Auto & Share Auto
+              <Footprints size={15} className="text-slate-600" /> Walking Transfers
             </span>
           </div>
         </div>

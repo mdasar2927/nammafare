@@ -8,15 +8,25 @@ import {
   BackendPlace,
   BackendSearchResponse,
 } from '@/types/transit';
-import { CHENNAI_LOCATIONS } from '@/data/locations';
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
- * Check backend health status
+ * Check backend health status and loaded Theme7 layers
  */
-export async function fetchHealth(): Promise<{ status: string; version: string; data_loaded: boolean } | null> {
+export async function fetchHealth(): Promise<{
+  status: string;
+  version: string;
+  data_loaded: boolean;
+  theme7_bus_stops_count?: number;
+  theme7_bus_routes_count?: number;
+  theme7_metro_corridors_count?: number;
+  theme7_metro_stations_count?: number;
+  theme7_suburban_tracks_count?: number;
+  theme7_suburban_stations_count?: number;
+  theme7_taz_zones_count?: number;
+} | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/health`, {
       cache: 'no-store',
@@ -30,24 +40,25 @@ export async function fetchHealth(): Promise<{ status: string; version: string; 
 }
 
 /**
- * Fetch autocomplete suggestions for Chennai places and stops
+ * Fetch autocomplete suggestions for actual Theme7 places, stations and stops
  */
 export async function fetchPlaces(query: string, limit = 8): Promise<ChennaiLocation[]> {
   try {
-    const res = await fetch(
-      `${API_BASE_URL}/api/v1/places?q=${encodeURIComponent(query)}&limit=${limit}`,
-      { cache: 'no-store' }
-    );
+    const url = query.trim()
+      ? `${API_BASE_URL}/api/v1/places?q=${encodeURIComponent(query.trim())}&limit=${limit}`
+      : `${API_BASE_URL}/api/v1/places?limit=${limit}`;
+
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Places API responded with ${res.status}`);
     const places: BackendPlace[] = await res.json();
 
     if (places && places.length > 0) {
       return places.map((p) => {
-        let hubType = 'Locality';
-        if (p.category === 'interchange') hubType = 'Transit Hub';
+        let hubType = 'Stop';
+        if (p.category === 'interchange') hubType = 'Interchange';
         else if (p.category === 'metro_station') hubType = 'Metro';
-        else if (p.category === 'railway_station') hubType = 'Railway';
-        else if (p.category === 'bus_stop') hubType = 'Bus Stand';
+        else if (p.category === 'railway_station') hubType = 'Suburban Rail';
+        else if (p.category === 'bus_stop') hubType = 'MTC Bus Stop';
 
         return {
           id: p.id,
@@ -56,66 +67,43 @@ export async function fetchPlaces(query: string, limit = 8): Promise<ChennaiLoca
           hubType,
           lat: p.lat,
           lng: p.lng,
+          source: p.source || 'Theme7',
           description: p.description,
         };
       });
     }
+    return [];
   } catch (err) {
-    console.warn('Using local fallback for autocomplete places:', err);
+    console.warn('Places fetch error:', err);
+    return [];
   }
-
-  // Fallback to local curated locations if backend is not responding or empty
-  const qLower = query.toLowerCase().trim();
-  if (!qLower) return CHENNAI_LOCATIONS.slice(0, limit);
-  return CHENNAI_LOCATIONS.filter((l) =>
-    l.name.toLowerCase().includes(qLower) || (l.tamilName && l.tamilName.includes(query))
-  ).slice(0, limit);
 }
 
 /**
- * Resolve coordinates for a given place name
+ * Resolve coordinates for a given place name using actual Theme7 places index
  */
 export async function resolveCoordinates(
   placeName: string
-): Promise<{ lat: number; lng: number }> {
-  // Check known canonical spots
-  const lower = placeName.toLowerCase();
-  if (lower.includes('central')) return { lat: 13.0827, lng: 80.2755 };
-  if (lower.includes('guindy')) return { lat: 13.0067, lng: 80.2128 };
-  if (lower.includes('egmore')) return { lat: 13.0784, lng: 80.2612 };
-  if (lower.includes('airport') || lower.includes('meenambakkam')) return { lat: 12.9806, lng: 80.1634 };
-  if (lower.includes('tambaram')) return { lat: 12.9249, lng: 80.1197 };
-  if (lower.includes('koyambedu') || lower.includes('cmbt')) return { lat: 13.0694, lng: 80.1948 };
-  if (lower.includes('velachery')) return { lat: 12.9757, lng: 80.2207 };
-  if (lower.includes('adyar')) return { lat: 13.0012, lng: 80.2565 };
-  if (lower.includes('t. nagar') || lower.includes('nagar')) return { lat: 13.0418, lng: 80.2341 };
-
-  // Query backend places endpoint
+): Promise<{ lat: number; lng: number } | null> {
   try {
     const places = await fetchPlaces(placeName, 1);
-    if (places && places.length > 0 && places[0].lat && places[0].lng) {
+    if (places && places.length > 0 && typeof places[0].lat === 'number' && typeof places[0].lng === 'number') {
       return { lat: places[0].lat, lng: places[0].lng };
     }
   } catch {
-    // ignore
+    // handled below
   }
-
-  // Fallback to central Chennai
-  return { lat: 13.0827, lng: 80.2755 };
+  return null;
 }
 
 /**
- * Map backend mode string to frontend TransitMode
+ * Map backend mode string to supported TransitMode (only walking, mtc_bus, metro, suburban_train)
  */
 function mapBackendMode(mode: string): TransitMode {
   const m = mode.toLowerCase().trim();
   if (m === 'bus') return 'mtc_bus';
-  if (m === 'walking') return 'walking';
   if (m === 'metro') return 'metro';
   if (m === 'suburban_train') return 'suburban_train';
-  if (m === 'auto') return 'auto';
-  if (m === 'share_auto') return 'share_auto';
-  if (m === 'taxi') return 'taxi';
   return 'walking';
 }
 
@@ -128,15 +116,22 @@ export interface SearchRoutesParams {
   sortBy: SortPreference;
 }
 
+export interface SearchRoutesResult {
+  routes: MultimodalRoute[];
+  message?: string | null;
+  originTaz?: string | null;
+  destTaz?: string | null;
+}
+
 /**
- * Execute route search against the FastAPI backend
+ * Execute route search against the FastAPI backend with strict no-mock policy
  */
 export async function searchRoutesApi(
   params: SearchRoutesParams
-): Promise<MultimodalRoute[]> {
+): Promise<SearchRoutesResult> {
   const { source, destination, gender, sortBy } = params;
 
-  // Resolve coordinates
+  // Resolve coordinates from input or backend places index
   const originCoords =
     params.sourceCoords && params.sourceCoords.lat && params.sourceCoords.lng
       ? params.sourceCoords
@@ -146,6 +141,13 @@ export async function searchRoutesApi(
     params.destCoords && params.destCoords.lat && params.destCoords.lng
       ? params.destCoords
       : await resolveCoordinates(destination);
+
+  if (!originCoords || !destinationCoords) {
+    return {
+      routes: [],
+      message: `Could not determine geospatial coordinates for "${!originCoords ? source : destination}". Please select a location from the autocomplete list.`,
+    };
+  }
 
   // Map frontend sort ('cost' | 'time') to backend sort ('cheapest' | 'fastest')
   const backendSortBy = sortBy === 'cost' ? 'cheapest' : 'fastest';
@@ -167,9 +169,6 @@ export async function searchRoutesApi(
       'bus',
       'metro',
       'suburban_train',
-      'auto',
-      'share_auto',
-      'taxi',
     ],
     sort_by: backendSortBy,
   };
@@ -191,11 +190,16 @@ export async function searchRoutesApi(
   const data: BackendSearchResponse = await res.json();
 
   if (!data.routes || data.routes.length === 0) {
-    return [];
+    return {
+      routes: [],
+      message: data.message || 'No connected public transport route found between these locations in Theme7 network.',
+      originTaz: data.origin_taz,
+      destTaz: data.destination_taz,
+    };
   }
 
   // Convert backend RouteOption[] to frontend MultimodalRoute[]
-  return data.routes.map((r) => {
+  const mappedRoutes: MultimodalRoute[] = data.routes.map((r) => {
     const legs: RouteLeg[] = r.legs.map((leg, index) => {
       const mode = mapBackendMode(leg.mode);
       const isOrdinary = leg.bus_type === 'ordinary';
@@ -210,7 +214,9 @@ export async function searchRoutesApi(
       if (mode === 'suburban_train' && !serviceType) {
         serviceType = 'Southern Railway 2nd Class';
       } else if (mode === 'metro' && !serviceType) {
-        serviceType = 'CMRL Metro';
+        serviceType = 'Chennai Metro Rail';
+      } else if (mode === 'walking') {
+        serviceType = 'Pedestrian Transfer';
       }
 
       return {
@@ -222,17 +228,20 @@ export async function searchRoutesApi(
         distanceMeters: leg.distance_meters,
         fare: leg.fare,
         baseFareMale: leg.fare,
-        fareType: leg.is_estimated ? 'estimated' : 'verified',
+        fareType: leg.is_verified ? 'verified' : 'estimated',
+        isVerified: leg.is_verified,
+        provenance: leg.provenance || undefined,
         routeNumber: leg.route_number || undefined,
         serviceType,
         isVidiyalEligible,
         fareNote: leg.fare_note || undefined,
-        instructions: `${leg.from_name} to ${leg.to_name}`,
+        instructions: `${leg.from_name} ➔ ${leg.to_name}`,
+        polyline: leg.polyline || undefined,
       };
     });
 
     const modes = Array.from(new Set(legs.map((l) => l.mode)));
-    const hasVerifiedFaresOnly = !legs.some((l) => l.fareType === 'estimated');
+    const hasVerifiedFaresOnly = !legs.some((l) => !l.isVerified);
 
     let highlightBadge: 'Cheapest' | 'Fastest' | 'Balanced' | undefined = undefined;
     if (r.is_cheapest) highlightBadge = 'Cheapest';
@@ -249,7 +258,16 @@ export async function searchRoutesApi(
       legs,
       calculatedTotalFare: r.total_fare,
       hasVerifiedFaresOnly,
+      isVerified: r.is_verified,
+      provenance: r.provenance || undefined,
       highlightBadge,
     };
   });
+
+  return {
+    routes: mappedRoutes,
+    message: data.message,
+    originTaz: data.origin_taz,
+    destTaz: data.destination_taz,
+  };
 }

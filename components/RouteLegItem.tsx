@@ -1,7 +1,7 @@
 import React from 'react';
 import { RouteLeg } from '@/types/transit';
 import { TransitIcon, getModeBadgeDetails } from '@/components/TransitIcon';
-import { ShieldCheck, HelpCircle, ArrowRight } from 'lucide-react';
+import { ShieldCheck, HelpCircle, ArrowRight, Database } from 'lucide-react';
 
 interface RouteLegItemProps {
   leg: RouteLeg;
@@ -43,7 +43,7 @@ export function RouteLegItem({ leg, isLast, stepNumber }: RouteLegItemProps) {
               </span>
               {leg.routeNumber && (
                 <span className="font-bold text-slate-800 text-xs bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                  {leg.routeNumber}
+                  Route {leg.routeNumber}
                 </span>
               )}
               {leg.serviceType && (
@@ -53,24 +53,26 @@ export function RouteLegItem({ leg, isLast, stepNumber }: RouteLegItemProps) {
               )}
             </div>
 
-            {/* Leg Fare Badge */}
-            <div className="flex items-center gap-1.5">
+            {/* Leg Fare & Verification Badge */}
+            <div className="flex items-center gap-2">
               <div
                 className={`font-bold px-2.5 py-1 rounded-lg text-xs flex items-center gap-1 ${
                   isZeroFare && leg.mode !== 'walking'
                     ? 'bg-rose-100 text-brand-900 border border-brand-200'
                     : isZeroFare
                     ? 'bg-slate-100 text-slate-600'
-                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : leg.isVerified
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
                 }`}
               >
                 <span>₹{leg.fare}</span>
-                {leg.fareType === 'verified' ? (
-                  <span title="Verified Official Government/Agency Fare">
+                {leg.isVerified ? (
+                  <span title="Verified Official Government Rate">
                     <ShieldCheck size={13} className="text-emerald-700" />
                   </span>
                 ) : (
-                  <span title="Calibrated Market / Indicative Estimate">
+                  <span title="Spatially Derived / Indicative Estimate">
                     <HelpCircle size={13} className="text-amber-600" />
                   </span>
                 )}
@@ -78,13 +80,13 @@ export function RouteLegItem({ leg, isLast, stepNumber }: RouteLegItemProps) {
             </div>
           </div>
 
-          {/* Stops / Trajectory */}
+          {/* Stops / Trajectory (Exact Theme7 stop names) */}
           <div className="flex flex-col gap-1.5 my-2">
             <div className="flex items-center gap-2 text-slate-800 font-medium">
               <span className="w-2 h-2 rounded-full bg-brand-800 shrink-0" />
-              <span>{leg.fromStop}</span>
+              <span className="font-semibold text-slate-900">{leg.fromStop}</span>
               <ArrowRight size={13} className="text-slate-400 shrink-0" />
-              <span>{leg.toStop}</span>
+              <span className="font-semibold text-slate-900">{leg.toStop}</span>
             </div>
 
             {leg.instructions && (
@@ -94,7 +96,7 @@ export function RouteLegItem({ leg, isLast, stepNumber }: RouteLegItemProps) {
             )}
           </div>
 
-          {/* Footer of leg */}
+          {/* Footer of leg: Duration, Distance, Notes & Data Provenance */}
           <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
             <div className="flex items-center gap-3">
               <span>{leg.durationMinutes} mins</span>
@@ -104,13 +106,28 @@ export function RouteLegItem({ leg, isLast, stepNumber }: RouteLegItemProps) {
                   ? `${(leg.distanceMeters / 1000).toFixed(1)} km`
                   : `${leg.distanceMeters} m`}
               </span>
+              {leg.isVerified ? (
+                <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Official Rate
+                </span>
+              ) : (
+                <span className="text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  Derived / Estimated
+                </span>
+              )}
             </div>
 
-            {leg.fareNote && (
-              <div className="text-[11px] font-medium text-slate-600 flex items-center gap-1">
-                <span>{leg.fareNote}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {leg.fareNote && (
+                <span className="font-medium text-slate-700">{leg.fareNote}</span>
+              )}
+              {leg.provenance && (
+                <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200" title={`Dataset Provenance: ${leg.provenance}`}>
+                  <Database size={10} className="text-slate-400" />
+                  {leg.provenance.replace('Theme7.', '').replace('Public_Transport.', '')}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
