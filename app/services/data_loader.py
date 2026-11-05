@@ -2,19 +2,16 @@ import os
 import struct
 import xml.etree.ElementTree as ET
 import zipfile
-import math
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
-def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> int:
-    """Calculate Haversine distance in meters between two coordinates."""
-    R = 6371000.0  # Earth radius in meters
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    a = (math.sin(delta_phi / 2.0) ** 2 +
-         math.cos(phi1) * math.cos(phi2) * (math.sin(delta_lambda / 2.0) ** 2))
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-    return int(R * c)
+from app.services.geometry_utils import (
+    haversine_meters,
+    read_shp_records,
+    utm44n_to_wgs84,
+    point_to_polyline_projection,
+    slice_polyline,
+    point_in_polygon,
+)
 
 def read_dbf_records(dbf_path: str) -> List[Dict[str, str]]:
     """Parse DBF binary file using standard library struct."""
@@ -61,7 +58,7 @@ def read_dbf_records(dbf_path: str) -> List[Dict[str, str]]:
         return []
 
 def read_xlsx_bus_stops(xlsx_path: str) -> List[Dict[str, Any]]:
-    """Parse bus stops from Theme7 Excel file using zipfile and ElementTree."""
+    """Parse real bus stops from Theme7 Excel file."""
     if not os.path.exists(xlsx_path):
         return []
     stops = []
@@ -104,7 +101,6 @@ def read_xlsx_bus_stops(xlsx_path: str) -> List[Dict[str, Any]]:
                             name = row_vals[1].strip()
                             lat = float(row_vals[2])
                             lng = float(row_vals[3])
-                            # Basic sanity check for Chennai bounding box
                             if 12.5 <= lat <= 13.5 and 79.8 <= lng <= 80.5:
                                 stops.append(
                                     {
@@ -114,7 +110,7 @@ def read_xlsx_bus_stops(xlsx_path: str) -> List[Dict[str, Any]]:
                                         "lat": lat,
                                         "lng": lng,
                                         "category": "bus_stop",
-                                        "source": "theme7_raw",
+                                        "source": "Theme7.Bus_Stops_List",
                                     }
                                 )
                         except (ValueError, TypeError):
@@ -124,7 +120,7 @@ def read_xlsx_bus_stops(xlsx_path: str) -> List[Dict[str, Any]]:
     return stops
 
 def read_kml_suburban_stations(kml_path: str) -> List[Dict[str, Any]]:
-    """Parse Suburban Railway stations from KML file."""
+    """Parse real Suburban Railway stations from KML file."""
     if not os.path.exists(kml_path):
         return []
     stations = []
@@ -135,7 +131,7 @@ def read_kml_suburban_stations(kml_path: str) -> List[Dict[str, Any]]:
         for idx, pm in enumerate(placemarks):
             name_elem = pm.find(".//{*}name")
             coords_elem = pm.find(".//{*}coordinates")
-            raw_name = name_elem.text.strip() if name_elem is not None else f"Station {idx+1}"
+            raw_name = name_elem.text.strip() if name_elem is not None else f"Stations {idx+1}"
             if coords_elem is not None and coords_elem.text:
                 parts = coords_elem.text.strip().split(",")
                 if len(parts) >= 2:
@@ -144,61 +140,37 @@ def read_kml_suburban_stations(kml_path: str) -> List[Dict[str, Any]]:
                     stations.append(
                         {
                             "id": f"sub_stn_{idx+1}",
+                            "name": f"Theme7 Suburban Station: {raw_name}",
                             "raw_name": raw_name,
                             "lat": lat,
                             "lng": lng,
                             "category": "railway_station",
-                            "source": "theme7_raw_anonymized",
+                            "source": "Theme7.Suburban_Stations_KML",
                         }
                     )
     except Exception as e:
         print(f"Error reading KML {kml_path}: {e}")
     return stations
 
-# Canonical Major Transit Hubs in Chennai with Ground Truth Coordinates
-# Used to augment anonymized stations with real names while preserving raw data
-CANONICAL_CHENNAI_HUBS = [
-    {"name": "Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)", "short": "Chennai Central", "lat": 13.0827, "lng": 80.2755, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]},
-    {"name": "Chennai Egmore", "short": "Egmore", "lat": 13.0784, "lng": 80.2612, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]},
-    {"name": "Guindy", "short": "Guindy", "lat": 13.0067, "lng": 80.2128, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]},
-    {"name": "Tambaram", "short": "Tambaram", "lat": 12.9249, "lng": 80.1000, "type": "hub", "modes": ["suburban_train", "bus"]},
-    {"name": "Chennai International Airport", "short": "Airport", "lat": 12.9800, "lng": 80.1636, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "Koyambedu (Puratchi Thalaivar Dr. MGR Bus Terminus)", "short": "Koyambedu CMBT", "lat": 13.0673, "lng": 80.1983, "type": "interchange", "modes": ["metro", "bus"]},
-    {"name": "Alandur", "short": "Alandur", "lat": 13.0041, "lng": 80.2015, "type": "interchange", "modes": ["metro"]},
-    {"name": "Vadapalani", "short": "Vadapalani", "lat": 13.0504, "lng": 80.2121, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "Thirumangalam", "short": "Thirumangalam", "lat": 13.0853, "lng": 80.1925, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "Anna Nagar Tower", "short": "Anna Nagar", "lat": 13.0862, "lng": 80.2132, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "T. Nagar (Thyagaraya Nagar)", "short": "T. Nagar", "lat": 13.0418, "lng": 80.2341, "type": "hub", "modes": ["bus", "suburban_train"]},
-    {"name": "Chennai Beach", "short": "Chennai Beach", "lat": 13.0924, "lng": 80.2936, "type": "interchange", "modes": ["suburban_train", "bus"]},
-    {"name": "Velachery", "short": "Velachery", "lat": 12.9759, "lng": 80.2212, "type": "hub", "modes": ["suburban_train", "bus"]},
-    {"name": "Thiruvanmiyur", "short": "Thiruvanmiyur", "lat": 12.9830, "lng": 80.2594, "type": "hub", "modes": ["suburban_train", "bus"]},
-    {"name": "Mylapore (Luz)", "short": "Mylapore", "lat": 13.0334, "lng": 80.2687, "type": "locality", "modes": ["bus", "suburban_train"]},
-    {"name": "Adyar (LB Road)", "short": "Adyar", "lat": 13.0064, "lng": 80.2575, "type": "locality", "modes": ["bus"]},
-    {"name": "Perambur", "short": "Perambur", "lat": 13.1098, "lng": 80.2335, "type": "interchange", "modes": ["suburban_train", "bus"]},
-    {"name": "Avadi", "short": "Avadi", "lat": 13.1166, "lng": 80.0984, "type": "hub", "modes": ["suburban_train", "bus"]},
-    {"name": "Poonamallee", "short": "Poonamallee", "lat": 13.0487, "lng": 80.0954, "type": "hub", "modes": ["bus"]},
-    {"name": "Sholinganallur (OMR)", "short": "Sholinganallur", "lat": 12.9010, "lng": 80.2279, "type": "locality", "modes": ["bus"]},
-    {"name": "Siruseri (SIPCOT IT Park)", "short": "Siruseri", "lat": 12.8258, "lng": 80.2195, "type": "locality", "modes": ["bus"]},
-    {"name": "Chromepet", "short": "Chromepet", "lat": 12.9517, "lng": 80.1408, "type": "railway_station", "modes": ["suburban_train", "bus"]},
-    {"name": "Pallavaram", "short": "Pallavaram", "lat": 12.9680, "lng": 80.1492, "type": "railway_station", "modes": ["suburban_train", "bus"]},
-    {"name": "St. Thomas Mount", "short": "St. Thomas Mount", "lat": 12.9958, "lng": 80.1981, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]},
-    {"name": "Nandanam", "short": "Nandanam", "lat": 13.0310, "lng": 80.2390, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "Saidapet", "short": "Saidapet", "lat": 13.0213, "lng": 80.2232, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]},
-    {"name": "Ashok Nagar", "short": "Ashok Nagar", "lat": 13.0354, "lng": 80.2114, "type": "metro_station", "modes": ["metro", "bus"]},
-    {"name": "Wimco Nagar", "short": "Wimco Nagar", "lat": 13.1706, "lng": 80.3014, "type": "interchange", "modes": ["metro", "suburban_train"]},
-    {"name": "Washermanpet", "short": "Washermanpet", "lat": 13.1118, "lng": 80.2831, "type": "interchange", "modes": ["metro", "suburban_train", "bus"]}
-]
-
 class TransitDataLoader:
     _instance = None
 
     def __init__(self, data_root: str = "data/raw/Theme7"):
         self.data_root = data_root
+
+        # Datasets
         self.bus_stops: List[Dict[str, Any]] = []
         self.bus_routes: List[Dict[str, Any]] = []
         self.metro_corridors: List[Dict[str, Any]] = []
+        self.metro_stations: List[Dict[str, Any]] = []
+        self.suburban_tracks: List[Dict[str, Any]] = []
         self.suburban_stations: List[Dict[str, Any]] = []
+        self.road_network: List[Dict[str, Any]] = []
+        self.taz_zones: List[Dict[str, Any]] = []
+
+        # Unified Search Index (Only Real Theme7 Places)
         self.places_index: List[Dict[str, Any]] = []
+
         self._load_all()
 
     @classmethod
@@ -208,103 +180,242 @@ class TransitDataLoader:
         return cls._instance
 
     def _load_all(self):
-        # 1. Load Bus Stops from Excel
+        print("Loading full Theme7 dataset into pure data-driven routing memory...")
+
+        # 1. Bus Stops (Excel)
         xlsx_path = os.path.join(self.data_root, "Tambaram, Avadi, GCC Bus Stops List  1.xlsx")
         self.bus_stops = read_xlsx_bus_stops(xlsx_path)
 
-        # 2. Load MTC Bus Routes from DBF
+        # 2. MTC Bus Routes (Shapefile + DBF)
+        mtc_shp = os.path.join(self.data_root, "Public Transport", "MTC", "routes_merged.shp")
         mtc_dbf = os.path.join(self.data_root, "Public Transport", "MTC", "routes_merged.dbf")
-        self.bus_routes = read_dbf_records(mtc_dbf)
+        shp_records = read_shp_records(mtc_shp, is_utm=False) if os.path.exists(mtc_shp) else []
+        dbf_records = read_dbf_records(mtc_dbf) if os.path.exists(mtc_dbf) else []
 
-        # 3. Load Metro Corridors
+        routes = []
+        for i in range(min(len(shp_records), len(dbf_records))):
+            geom = shp_records[i]
+            attr = dbf_records[i]
+            if geom["type"] == "polyline" and len(geom["points"]) >= 2:
+                pts = geom["points"]
+                lats = [p[0] for p in pts]
+                lngs = [p[1] for p in pts]
+                routes.append({
+                    "index": i,
+                    "route_num": attr.get("route_num", f"MTC-{i+1}"),
+                    "source": attr.get("source", "Origin Terminus"),
+                    "destinat": attr.get("destinat", "Destination Terminus"),
+                    "route_id": attr.get("route_id", str(i+1)),
+                    "poly_idx": attr.get("poly_idx", "1"),
+                    "points": pts,
+                    "bbox": (min(lats), min(lngs), max(lats), max(lngs)),
+                })
+        self.bus_routes = routes
+
+        # 3. Metro Corridors & Stations (Shapefile + DBF)
+        metro_shp = os.path.join(self.data_root, "Public Transport", "Metro Rail", "Operational_Metro.shp")
         metro_dbf = os.path.join(self.data_root, "Public Transport", "Metro Rail", "Operational_Metro.dbf")
-        self.metro_corridors = read_dbf_records(metro_dbf)
+        m_lines = read_shp_records(metro_shp, is_utm=False) if os.path.exists(metro_shp) else []
+        m_attr = read_dbf_records(metro_dbf) if os.path.exists(metro_dbf) else []
 
-        # 4. Load Suburban Stations from KML
+        metro_corr = []
+        for i in range(min(len(m_lines), len(m_attr))):
+            geom = m_lines[i]
+            attr = m_attr[i]
+            if geom["type"] == "polyline" and len(geom["points"]) >= 2:
+                metro_corr.append({
+                    "id": attr.get("id", str(i+1)),
+                    "corridor": attr.get("Corridors", f"Corridor {i+1}"),
+                    "phasing": attr.get("Phasing", "Phase 1"),
+                    "length_km": attr.get("Length", "20.0"),
+                    "points": geom["points"],
+                })
+        self.metro_corridors = metro_corr
+
+        stn_shp = os.path.join(self.data_root, "Public Transport", "Metro Rail", "Operational_Metro_Stns.shp")
+        stn_dbf = os.path.join(self.data_root, "Public Transport", "Metro Rail", "Operational_Metro_Stns.dbf")
+        s_pts = read_shp_records(stn_shp, is_utm=False) if os.path.exists(stn_shp) else []
+        s_attr = read_dbf_records(stn_dbf) if os.path.exists(stn_dbf) else []
+
+        m_stns = []
+        for i in range(min(len(s_pts), len(s_attr))):
+            geom = s_pts[i]
+            attr = s_attr[i]
+            if geom["type"] == "point":
+                raw_name = attr.get("Name", f"Phase 1 Stations {i+1}")
+                m_stns.append({
+                    "id": f"metro_stn_{i+1}",
+                    "name": f"Theme7 Metro Station: {raw_name}",
+                    "raw_name": raw_name,
+                    "lat": geom["point"][0],
+                    "lng": geom["point"][1],
+                    "category": "metro_station",
+                    "source": "Theme7.Operational_Metro_Stns",
+                })
+        self.metro_stations = m_stns
+
+        # 4. Suburban Rail Tracks & Stations (UTM converted to WGS84)
+        rail_shp = os.path.join(self.data_root, "Public Transport", "Suburban Rail", "Rail_Network_Updated.shp")
+        rail_dbf = os.path.join(self.data_root, "Public Transport", "Suburban Rail", "Rail_Network_Updated.dbf")
+        r_lines = read_shp_records(rail_shp, is_utm=True) if os.path.exists(rail_shp) else []
+        r_attr = read_dbf_records(rail_dbf) if os.path.exists(rail_dbf) else []
+
+        s_tracks = []
+        for i in range(min(len(r_lines), len(r_attr))):
+            geom = r_lines[i]
+            attr = r_attr[i]
+            if geom["type"] == "polyline" and len(geom["points"]) >= 2:
+                s_tracks.append({
+                    "id": attr.get("OBJECTID", str(i+1)),
+                    "type": attr.get("Type", "Suburban"),
+                    "tracks": attr.get("Tracks", "2"),
+                    "length": attr.get("LENGTH", "1000"),
+                    "points": geom["points"],
+                })
+        self.suburban_tracks = s_tracks
+
         kml_path = os.path.join(self.data_root, "Public Transport", "Suburban Rail", "Suburban Stations.kml")
         self.suburban_stations = read_kml_suburban_stations(kml_path)
 
-        # 5. Build Comprehensive Places Index
+        # 5. Road Network (UTM to WGS84)
+        road_shp = os.path.join(self.data_root, "Road Network Old CMA", "Road_Network_Old CMA.shp")
+        road_dbf = os.path.join(self.data_root, "Road Network Old CMA", "Road_Network_Old CMA.dbf")
+        rd_lines = read_shp_records(road_shp, is_utm=True) if os.path.exists(road_shp) else []
+        rd_attr = read_dbf_records(road_dbf) if os.path.exists(road_dbf) else []
+
+        roads = []
+        for i in range(min(len(rd_lines), len(rd_attr))):
+            geom = rd_lines[i]
+            attr = rd_attr[i]
+            if geom["type"] == "polyline" and len(geom["points"]) >= 2:
+                roads.append({
+                    "id": attr.get("NO", str(i+1)),
+                    "lanes": attr.get("NUMLANES", "2"),
+                    "speed": attr.get("V0PRT", "35km/h"),
+                    "length_km": attr.get("Length", "0.5"),
+                    "points": geom["points"],
+                })
+        self.road_network = roads
+
+        # 6. TAZ Polygons (UTM to WGS84)
+        taz_shp = os.path.join(self.data_root, "Traffic Analysis Zones", "TAZ_old-CMA.shp")
+        taz_dbf = os.path.join(self.data_root, "Traffic Analysis Zones", "TAZ_old-CMA.dbf")
+        t_polys = read_shp_records(taz_shp, is_utm=True) if os.path.exists(taz_shp) else []
+        t_attr = read_dbf_records(taz_dbf) if os.path.exists(taz_dbf) else []
+
+        zones = []
+        for i in range(min(len(t_polys), len(t_attr))):
+            geom = t_polys[i]
+            attr = t_attr[i]
+            if geom["type"] == "polygon" and len(geom["points"]) >= 3:
+                pts = geom["points"]
+                lats = [p[0] for p in pts]
+                lngs = [p[1] for p in pts]
+                zones.append({
+                    "taz_id": attr.get("taz", str(i+1)),
+                    "region": attr.get("region", "Old CMA"),
+                    "district": attr.get("district", "Chennai"),
+                    "sample_count": attr.get("sample_cou", "0"),
+                    "points": pts,
+                    "bbox": (min(lats), min(lngs), max(lats), max(lngs)),
+                })
+        self.taz_zones = zones
+
+        # 7. Build Places Index strictly from Theme7 records
         self._build_places_index()
 
     def _build_places_index(self):
         index = []
-        # A. Add Canonical Transit Hubs
-        for idx, hub in enumerate(CANONICAL_CHENNAI_HUBS):
-            index.append({
-                "id": f"hub_{idx+1}",
-                "name": hub["name"],
-                "short_name": hub["short"],
-                "category": hub["type"],
-                "lat": hub["lat"],
-                "lng": hub["lng"],
-                "modes": hub["modes"],
-                "source": "canonical_hub",
-                "description": f"Chennai Transit Hub ({', '.join(hub['modes']).title()})"
-            })
 
-        # B. Add Theme7 Bus Stops (deduplicating by normalized name & proximity)
-        seen_stops = {}
+        # A. Theme7 Bus Stops (deduplicated by normalized name)
+        seen = set()
         for bs in self.bus_stops:
             norm = bs["name"].lower().strip()
-            if norm not in seen_stops:
-                seen_stops[norm] = bs
+            if norm not in seen:
+                seen.add(norm)
                 index.append({
                     "id": bs["id"],
                     "name": bs["name"],
-                    "short_name": bs["name"],
                     "category": "bus_stop",
                     "lat": bs["lat"],
                     "lng": bs["lng"],
-                    "modes": ["bus"],
-                    "source": "theme7_bus_stops",
-                    "description": f"MTC Bus Stop ({bs['corporation']} Corporation)"
+                    "source": bs["source"],
+                    "description": f"Theme7 MTC Bus Stop ({bs['corporation']} Corporation)",
                 })
 
+        # B. Theme7 Metro Stations
+        for ms in self.metro_stations:
+            index.append({
+                "id": ms["id"],
+                "name": ms["name"],
+                "category": "metro_station",
+                "lat": ms["lat"],
+                "lng": ms["lng"],
+                "source": ms["source"],
+                "description": "Theme7 Operational Metro Station (CMRL Phase 1/2)",
+            })
+
+        # C. Theme7 Suburban Stations
+        for ss in self.suburban_stations:
+            index.append({
+                "id": ss["id"],
+                "name": ss["name"],
+                "category": "railway_station",
+                "lat": ss["lat"],
+                "lng": ss["lng"],
+                "source": ss["source"],
+                "description": "Theme7 Suburban Railway Station Placemark",
+            })
+
         self.places_index = index
+        print(f"Theme7 Places Index built: {len(self.places_index)} real stations and stops.")
 
     def search_places(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search transit places, hubs, and bus stops with substring and prefix matching."""
+        """Search actual Theme7 stations and bus stops by substring query."""
         q = query.lower().strip()
         if not q:
-            # Return top major hubs
             return self.places_index[:limit]
 
-        exact_matches = []
-        prefix_matches = []
-        sub_matches = []
+        exact = []
+        prefix = []
+        sub = []
 
         for p in self.places_index:
             name_lower = p["name"].lower()
-            short_lower = p.get("short_name", "").lower()
-            if q == name_lower or q == short_lower:
-                exact_matches.append(p)
-            elif name_lower.startswith(q) or short_lower.startswith(q):
-                prefix_matches.append(p)
-            elif q in name_lower or q in short_lower:
-                sub_matches.append(p)
+            if q == name_lower:
+                exact.append(p)
+            elif name_lower.startswith(q):
+                prefix.append(p)
+            elif q in name_lower:
+                sub.append(p)
 
-        # Prioritize canonical hubs and exact matches
-        combined = exact_matches + prefix_matches + sub_matches
-        seen = set()
+        combined = exact + prefix + sub
         deduped = []
-        for item in combined:
-            if item["id"] not in seen:
-                seen.add(item["id"])
-                deduped.append(item)
+        seen = set()
+        for p in combined:
+            if p["id"] not in seen:
+                seen.add(p["id"])
+                deduped.append(p)
             if len(deduped) >= limit:
                 break
         return deduped
 
-    def find_nearest_place(self, lat: float, lng: float, mode_filter: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Find the closest transit place to a given coordinate."""
+    def find_nearest_bus_stop(self, lat: float, lng: float, max_radius_m: int = 1500) -> Optional[Tuple[Dict[str, Any], int]]:
+        """Find the single closest actual Theme7 bus stop within radius."""
         closest = None
         min_dist = float("inf")
-        for p in self.places_index:
-            if mode_filter and mode_filter not in p.get("modes", []):
-                continue
-            dist = haversine_distance_meters(lat, lng, p["lat"], p["lng"])
-            if dist < min_dist:
-                min_dist = dist
-                closest = (p, dist)
+        for bs in self.bus_stops:
+            d = haversine_meters(lat, lng, bs["lat"], bs["lng"])
+            if d < min_dist and d <= max_radius_m:
+                min_dist = d
+                closest = (bs, d)
         return closest
+
+    def find_taz_zone(self, lat: float, lng: float) -> Optional[str]:
+        """Find the Traffic Analysis Zone (TAZ) containing the coordinate."""
+        for z in self.taz_zones:
+            min_lat, min_lng, max_lat, max_lng = z["bbox"]
+            if min_lat <= lat <= max_lat and min_lng <= lng <= max_lng:
+                if point_in_polygon(lat, lng, z["points"]):
+                    return f"TAZ {z['taz_id']} ({z['district']})"
+        return None

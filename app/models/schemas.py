@@ -34,10 +34,10 @@ class Coordinates(BaseModel):
 class Place(BaseModel):
     id: str
     name: str
-    category: str  # "bus_stop", "metro_station", "railway_station", "locality"
+    category: str  # "bus_stop", "metro_station", "railway_station"
     lat: float
     lng: float
-    source: str = "theme7"  # "theme7" or "canonical"
+    source: str = "theme7"
     description: Optional[str] = None
 
 class RouteLeg(BaseModel):
@@ -51,6 +51,8 @@ class RouteLeg(BaseModel):
     fare: float
     fare_note: Optional[str] = None
     is_estimated: bool = False
+    is_verified: bool = False
+    provenance: Optional[str] = None
     polyline: Optional[List[List[float]]] = None
 
 class RouteOption(BaseModel):
@@ -64,6 +66,8 @@ class RouteOption(BaseModel):
     arrival_time: str
     is_cheapest: bool = False
     is_fastest: bool = False
+    is_verified: bool = False
+    provenance: Optional[str] = None
     legs: List[RouteLeg]
 
 class SearchRequest(BaseModel):
@@ -76,9 +80,6 @@ class SearchRequest(BaseModel):
             "bus",
             "metro",
             "suburban_train",
-            "auto",
-            "share_auto",
-            "taxi",
         ]
     )
     departure_time: Optional[str] = None
@@ -90,9 +91,20 @@ class SearchResponse(BaseModel):
     destination: str
     departure_time: str
     gender: str
+    origin_taz: Optional[str] = None
+    destination_taz: Optional[str] = None
+    message: Optional[str] = None
     routes: List[RouteOption]
 
 class HealthResponse(BaseModel):
     status: str
     version: str = "1.0.0"
     data_loaded: bool = True
+    theme7_bus_stops_count: int = 0
+    theme7_bus_routes_count: int = 0
+    theme7_metro_corridors_count: int = 0
+    theme7_metro_stations_count: int = 0
+    theme7_suburban_tracks_count: int = 0
+    theme7_suburban_stations_count: int = 0
+    theme7_taz_zones_count: int = 0
+    theme7_road_links_count: int = 0
