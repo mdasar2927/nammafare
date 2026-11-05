@@ -32,13 +32,64 @@ class Coordinates(BaseModel):
     name: Optional[str] = None
 
 class Place(BaseModel):
+    """Backward-compatible place model (used by existing /api/v1/places endpoint)."""
     id: str
     name: str
-    category: str  # "bus_stop", "metro_station", "railway_station"
+    category: str  # "bus_stop", "metro_station", "railway_station", "place"
     lat: float
     lng: float
     source: str = "theme7"
+    provenance: Optional[str] = None
+    is_verified: bool = True
     description: Optional[str] = None
+    display_address: Optional[str] = None
+
+# ---------------------------------------------------------------------------
+# Unified location discovery models
+# ---------------------------------------------------------------------------
+
+class PlaceResult(BaseModel):
+    """Rich place result with provenance metadata (used by /api/v1/places/search etc.)."""
+    id: str
+    name: str
+    category: str  # "place", "bus_stop", "metro_station", "railway_station"
+    lat: float
+    lng: float
+    source: str
+    provenance: str
+    is_verified: bool = False
+    description: Optional[str] = None
+    display_address: Optional[str] = None
+
+class PlacesSearchResponse(BaseModel):
+    """Grouped response from unified location search."""
+    query: str
+    places: List[PlaceResult]            # geocoded addresses/landmarks from Nominatim
+    bus_stops: List[PlaceResult]         # Theme7 MTC bus stops
+    metro_stations: List[PlaceResult]    # Theme7 metro stations
+    railway_stations: List[PlaceResult]  # Theme7 suburban railway stations
+    attribution: str = (
+        "Transport network: Theme7 dataset (organization-provided). "
+        "Places/addresses: © OpenStreetMap contributors (ODbL)."
+    )
+
+class ReverseGeocodeResponse(BaseModel):
+    """Response for reverse geocoding a coordinate."""
+    lat: float
+    lng: float
+    display_name: str
+    source: str
+    provenance: str
+    nearby_transport: Optional[List[PlaceResult]] = None
+
+class NearbyTransportResponse(BaseModel):
+    """Nearby Theme7 transport stops around a coordinate."""
+    lat: float
+    lng: float
+    radius_m: int
+    bus_stops: List[PlaceResult]
+    metro_stations: List[PlaceResult]
+    railway_stations: List[PlaceResult]
 
 class RouteLeg(BaseModel):
     mode: str

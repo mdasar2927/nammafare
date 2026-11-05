@@ -203,3 +203,4 @@ def point_in_polygon(lat: float, lng: float, polygon: List[Tuple[float, float]])
                     inside = not inside
         p1lat, p1lng = p2lat, p2lng
     return inside
+

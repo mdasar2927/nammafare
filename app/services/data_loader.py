@@ -340,7 +340,9 @@ class TransitDataLoader:
                     "lat": bs["lat"],
                     "lng": bs["lng"],
                     "source": bs["source"],
-                    "description": f"Theme7 MTC Bus Stop ({bs['corporation']} Corporation)",
+                    "provenance": "Theme7 dataset — Bus_Stops_List.xlsx (organization-provided)",
+                    "is_verified": True,
+                    "description": f"MTC Bus Stop ({bs['corporation']} Corporation)",
                 })
 
         # B. Theme7 Metro Stations
@@ -352,7 +354,9 @@ class TransitDataLoader:
                 "lat": ms["lat"],
                 "lng": ms["lng"],
                 "source": ms["source"],
-                "description": "Theme7 Operational Metro Station (CMRL Phase 1/2)",
+                "provenance": "Theme7 dataset — Operational_Metro_Stns shapefile (organization-provided)",
+                "is_verified": True,
+                "description": "CMRL Metro Station (Phase 1/2)",
             })
 
         # C. Theme7 Suburban Stations
@@ -364,7 +368,9 @@ class TransitDataLoader:
                 "lat": ss["lat"],
                 "lng": ss["lng"],
                 "source": ss["source"],
-                "description": "Theme7 Suburban Railway Station Placemark",
+                "provenance": "Theme7 dataset — Suburban_Stations_KML (organization-provided)",
+                "is_verified": True,
+                "description": "Chennai Suburban Railway Station",
             })
 
         self.places_index = index
@@ -419,3 +425,48 @@ class TransitDataLoader:
                 if point_in_polygon(lat, lng, z["points"]):
                     return f"TAZ {z['taz_id']} ({z['district']})"
         return None
+
+    def find_nearby_transport(
+        self,
+        lat: float,
+        lng: float,
+        radius_m: int = 800,
+    ) -> Dict[str, List[Tuple[Dict[str, Any], int]]]:
+        """
+        Return Theme7 transport stops within *radius_m* metres of (lat, lng).
+
+        Results are sorted by ascending distance.
+        Returns dict with keys: "bus_stops", "metro_stations", "railway_stations".
+        Each entry is a list of (stop_dict, distance_metres) tuples.
+        """
+        from app.core import config as cfg
+
+        # Bus stops
+        bus_hits = []
+        for bs in self.bus_stops:
+            d = haversine_meters(lat, lng, bs["lat"], bs["lng"])
+            if d <= radius_m:
+                bus_hits.append((bs, int(d)))
+        bus_hits.sort(key=lambda x: x[1])
+
+        # Metro stations
+        metro_hits = []
+        for ms in self.metro_stations:
+            d = haversine_meters(lat, lng, ms["lat"], ms["lng"])
+            if d <= radius_m:
+                metro_hits.append((ms, int(d)))
+        metro_hits.sort(key=lambda x: x[1])
+
+        # Suburban railway stations
+        rail_hits = []
+        for ss in self.suburban_stations:
+            d = haversine_meters(lat, lng, ss["lat"], ss["lng"])
+            if d <= radius_m:
+                rail_hits.append((ss, int(d)))
+        rail_hits.sort(key=lambda x: x[1])
+
+        return {
+            "bus_stops": bus_hits[: cfg.NEARBY_MAX_BUS_STOPS],
+            "metro_stations": metro_hits[: cfg.NEARBY_MAX_METRO],
+            "railway_stations": rail_hits[: cfg.NEARBY_MAX_RAIL],
+        }
