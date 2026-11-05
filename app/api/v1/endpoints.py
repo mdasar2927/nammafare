@@ -30,7 +30,11 @@ from app.models.schemas import (
 )
 from app.services.data_loader import TransitDataLoader
 from app.services.routing_engine import MultimodalRoutingEngine
-from app.services.geocoding_service import get_geocoding_provider, OSM_ATTRIBUTION
+from app.services.geocoding_service import (
+    get_forward_geocoding_provider,
+    get_reverse_geocoding_provider,
+    OSM_ATTRIBUTION,
+)
 from app.core import config
 
 router = APIRouter()
@@ -122,11 +126,11 @@ def search_places_unified(
         elif cat == "railway_station" and len(railway_stations) < limit:
             railway_stations.append(pr)
 
-    # 2. Nominatim geocoded places (external — Chennai only)
+    # 2. Photon geocoded places (external forward geocoder — Chennai only)
     geocoded_places: List[PlaceResult] = []
     if include_geocoded:
         try:
-            provider = get_geocoding_provider()
+            provider = get_forward_geocoding_provider()
             raw_places = provider.search(q_stripped, limit=limit)
             for gp in raw_places:
                 geocoded_places.append(
@@ -191,7 +195,7 @@ def reverse_geocode(
     provenance = "Raw coordinate (no geocoding result)"
 
     try:
-        provider = get_geocoding_provider()
+        provider = get_reverse_geocoding_provider()
         result = provider.reverse(lat, lng)
         if result:
             display_name = result.display_address or result.name
@@ -309,7 +313,7 @@ def get_places(
 
     if include_geocoded and q_clean:
         try:
-            provider = get_geocoding_provider()
+            provider = get_forward_geocoding_provider()
             geo_results = provider.search(q_clean, limit=min(limit, config.GEOCODER_MAX_RESULTS))
             seen_ids = {p.id for p in places}
             for gp in geo_results:
