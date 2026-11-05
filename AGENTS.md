@@ -11,11 +11,12 @@ The core goal of NammaFare is to provide transparent, accurate fare estimations 
 ## 2. Technology Stack
 
 ### 2.1 Frontend
-- **Framework:** Next.js (App Router preferred)
+- **Framework:** Next.js (App Router)
 - **UI Library:** React
 - **Styling:** Tailwind CSS (utility-first, responsive, accessible)
-- **State Management & Data Fetching:** React hooks, TanStack Query / SWR / Fetch API
+- **State Management & Data Fetching:** React hooks, Fetch API / SWR
 - **Icons & UI Utilities:** Lucide React (or equivalent lightweight SVG icons), clsx, tailwind-merge
+- *Note on Mapping:* Interactive mapping (Leaflet / OpenStreetMap) is deferred to post-MVP. The MVP focuses on a crisp, responsive card-based comparison and step-by-step itinerary breakdown.
 
 ### 2.2 Backend
 - **Language:** Python (3.11+)
@@ -24,63 +25,74 @@ The core goal of NammaFare is to provide transparent, accurate fare estimations 
 - **Server:** Uvicorn
 - **Package & Dependency Management:** Virtual environment (`venv`) with `pip` / `requirements.txt` or `pyproject.toml`
 
-### 2.3 Mapping & Geospatial
+### 2.3 Post-MVP Geospatial & Mapping Roadmap
 - **Map Renderer:** Leaflet (`react-leaflet` or vanilla Leaflet in client-side Next.js components)
 - **Map Tiles:** OpenStreetMap (OSM) standard tile servers
-- **Routing & Geocoding:** Integration with OSM / OSRM / Nominatim or pre-indexed Chennai transit GTFS/GIS data
+- **Geocoding & Transit GIS:** Chennai transit GTFS, OSM Nominatim/OSRM integration
 
 ---
 
-## 3. Supported Chennai Transport Modes
+## 3. Supported Chennai Transport Modes & Data Classification
 
-NammaFare models and combines the following transport options into seamless multimodal itineraries:
+NammaFare encompasses all seven agreed Chennai transit modes in the backend scope, with an explicit distinction between **verified official fare data** and **indicative estimates**:
 
-1. **Walking:** First-mile, last-mile, and transit transfer connections.
-2. **MTC Bus:** Metropolitan Transport Corporation bus network (Ordinary / White-Board, Express, Deluxe, and AC Volvo services).
-3. **Chennai Metro (CMRL):** Blue Line, Green Line, and upcoming extensions.
-4. **Suburban Train:** Chennai Suburban Railway network (Southern Railway lines: Chennai Central–Arakkonam, Chennai Beach–Tambaram–Chengalpattu, Chennai Central–Gummidipoondi, and MRTS Chennai Beach–Velachery).
-5. **Auto Rickshaw:** Standard auto rickshaw estimates (meter base + per-km slabs or calibrated street estimates).
-6. **Share Auto:** Point-to-point and arterial feeder routes (e.g., Guindy, Koyambedu, Ashok Pillar corridors) at standardized flat/hop fares.
-7. **Taxi / Cab:** App-cab / street taxi estimates for point-to-point and emergency/comfort connections.
+### 3.1 Verified Official Data (Published Fare Tables)
+1. **MTC Bus:** Metropolitan Transport Corporation bus network
+   - *Ordinary / White-Board Buses:* Stage-based fare chart (₹5 to ₹14+), with statutory zero-fare for women under *Vidiyal Payana Thittam*.
+   - *Express / Deluxe / AC Services:* Official fixed stage-fare tables (chargeable for all commuters).
+2. **Chennai Metro (CMRL):** Blue Line & Green Line
+   - Official station-to-station distance slabs (standard fare ₹10, ₹20, ₹30, ₹40, ₹50).
+3. **Suburban Train (Southern Railway / Chennai Suburban & MRTS):**
+   - Official Indian Railways unreserved second-class fare stages (e.g., ₹5 base up to 20 km, ₹10 up to 45 km).
+
+### 3.2 Indicative & Calibrated Estimates (Street / Market Rates)
+4. **Auto Rickshaw:** Calibrated Chennai daytime estimates based on minimum meter base (₹25–₹30 for first 1.8 km) + per-km slab (₹12–₹15/km), with clear indicative disclaimer.
+5. **Share Auto:** Standard fixed-corridor and arterial feeder hop rates (e.g., ₹15–₹30 flat stages across corridors like Guindy, Koyambedu, Vadapalani, Ashok Pillar).
+6. **Taxi / Cab:** Indicative point-to-point aggregator/cab daytime estimates (base fare + per-km rate).
+7. **Walking:** Pedestrian legs for first-mile, last-mile, and inter-modal transfers (assumed walking speed of ~4.5–5 km/h, zero cost).
 
 ---
 
-## 4. User Workflow (Two-Page Architecture)
+## 4. Confirmed MVP User Workflow (Two-Page Architecture)
 
-NammaFare is structured around a streamlined, responsive two-page journey:
+The MVP is strictly scoped to a streamlined two-page flow with no extraneous controls:
 
 ```
 [ Page 1: Journey Search ] ──▶ User submits parameters ──▶ [ Page 2: Route Comparison ]
-  - Origin & Destination                                    - Summary stats (Cheapest vs Fastest)
-  - Gender Selection (M / F / Other)                        - Interactive Leaflet/OSM map
-  - Transport Mode Preferences                              - List of multimodal itinerary cards
-  - Departure / Arrival time                                - Detailed per-leg fare & ETA breakdown
-                                                            - Cost & Time sorting tabs/filters
+  - Source (Origin)                                         - Editable Cost / Time sorting controls
+  - Destination                                             - Editable Male / Female toggle
+  - Lowest Cost / Least Time preference                     - Multimodal journey cards
+  - Male / Female toggle (Male default)                     - Expandable fare & leg breakdown
+  - "Search Routes" button                                  - Total fare & ETA per journey
 ```
 
-### Page 1: Journey Search
-- **Origin & Destination Inputs:** Searchable location fields with autocomplete support for Chennai localities, transit stops, and landmarks.
-- **Gender Selection:** Male / Female selection (critical for MTC fare calculation rules).
-- **Mode Toggles:** Checkboxes or chips to enable/disable specific modes (e.g., exclude cabs or prioritize rail).
-- **Time/Departure Preferences:** "Leave Now" or specific time picker.
-- **Action:** "Find Routes" trigger submitting the search parameters to the backend routing engine.
+### 4.1 Page 1: Journey Search
+- **Source (Origin) Input:** Text input with Chennai locality/station autocomplete or suggestions.
+- **Destination Input:** Text input with Chennai locality/station autocomplete or suggestions.
+- **Preference Selector:** Toggle/selector for **Lowest Cost** vs **Least Time**.
+- **Gender Toggle:** **Male** or **Female** only (strictly no "Other" option in MVP). **Default value: Male**.
+- **Search Trigger:** "Search Routes" button submitting query parameters to Page 2 / backend routing engine.
+- *Explicit MVP Exclusions:*
+  - No gender "Other" option.
+  - No transport mode selector or checkboxes (all applicable modes considered automatically).
+  - No departure/arrival time picker (assumes immediate/daytime travel).
+  - No interactive map.
 
-### Page 2: Route Comparison
-- **Map View:** Embedded Leaflet map displaying:
-  - Route polylines color-coded by transit mode (e.g., Blue for Metro, Green for Suburban, Red/Yellow for MTC bus, Grey for walking).
-  - Stop markers, transfer interchange nodes, and origin/destination pins.
-- **Route Cards:** Multi-modal itinerary options comparing:
-  - Total Estimated Fare (₹).
-  - Total Travel Time & Estimated Time of Arrival (ETA).
-  - Number of transfers and leg summary (e.g., Walk 300m ➜ MTC Bus 21G ➜ Walk 150m).
-- **Sorting Controls:**
-  - **Cheapest First (Lowest Cost)**
-  - **Fastest First (Shortest Duration / ETA)**
-  - Optional: Minimum Transfers
-- **Leg-by-Leg Details (Expandable/Drawer):**
-  - Departure and arrival timings per step.
-  - Transparent fare breakdown per segment (e.g., MTC Bus: ₹0 for female commuter; Suburban: ₹5; Metro: ₹30).
-  - Instructions for transfers and platform/stop names.
+### 4.2 Page 2: Route Comparison
+- **Top Bar Controls (Fully Editable):**
+  - **Cost / Time Sorting Switch:** Toggle between **Lowest Cost** and **Least Time** to instantly reorder results.
+  - **Male / Female Toggle:** Editable toggle on the results page allowing users to switch gender and instantly see reactive fare re-calculations (especially MTC ordinary bus zero-fare).
+- **Multimodal Journey Cards:**
+  - Distinct cards for each viable journey option (e.g., Suburban Train + Bus, Metro + Share Auto, Direct Bus).
+  - **Total Estimated Fare (₹)** prominently displayed.
+  - **Total Travel Time & ETA** prominently displayed.
+  - Leg summary preview (e.g., `Walk 5m` ➜ `MTC Bus 18A` ➜ `Walk 4m`).
+- **Expandable Fare & Leg Breakdown:**
+  - Per-leg mode, line/route number, boarding and alighting stop names.
+  - Individual leg fare with transparent notes (e.g., *₹0 - MTC Ordinary [Vidiyal Payana Thittam]* or *₹5 - Suburban 2nd Class*).
+  - Clear visual badge for verified fares vs indicative estimates.
+- *Explicit MVP Exclusions:*
+  - No interactive map on MVP (reserved for post-MVP).
 
 ---
 
@@ -88,88 +100,108 @@ NammaFare is structured around a streamlined, responsive two-page journey:
 
 ### 5.1 Gender-Based MTC Fare Rule (*Vidiyal Payana Thittam*)
 - Under the Tamil Nadu Government scheme (*Vidiyal Payana Thittam*), **women travel free of charge** in standard **MTC Ordinary (White-Board) buses**.
-- **Fare Rules:**
-  - If commuter is **Female**: Fare for ordinary MTC bus legs is strictly **₹0**.
-  - If commuter is **Male**: Standard distance-based MTC stage fare table applies (e.g., ₹5 to ₹25+ depending on stage distance).
-  - Express, Deluxe, and AC services remain chargeable for all genders based on their respective fare charts.
+- **Calculation Logic:**
+  - When gender is **Female**: Fare for ordinary MTC bus legs is strictly **₹0**.
+  - When gender is **Male** (Default): Standard distance-based MTC stage fare table applies (₹5, ₹8, ₹10, ₹12, ₹14+).
+  - Express, Deluxe, and AC services remain chargeable for both genders.
 
-### 5.2 Transparent Fare Breakdown
-- Every route option must display:
-  - **Total Estimated Fare** clearly badge-marked (e.g., `₹25`).
-  - **Per-leg fare explanation** detailing the ticketing rule applied (e.g., *Suburban 2nd class ticket: ₹5*, *MTC Ordinary: ₹0 [Vidiyal Payana Thittam]*).
-  - Explicit disclaimer when fares are indicative (e.g., auto rickshaw or taxi fares calculated using standard daytime rates).
+### 5.2 Fare Transparency Badging
+- Every leg and total fare must provide clear transparency:
+  - **[Verified]**: For CMRL Metro, MTC Bus, and Southern Railway Suburban Train legs backed by official government fare tables.
+  - **[Estimated]**: For Auto Rickshaw, Share Auto, and Taxi legs with indicative pricing disclaimers.
 
 ---
 
 ## 6. API Integration Conventions
 
 ### 6.1 Communication & Protocols
-- RESTful HTTP APIs communicating strictly with JSON payloads.
+- RESTful HTTP APIs with JSON payloads.
 - Base path prefix: `/api/v1`.
 - CORS configured in FastAPI to allow requests from the Next.js frontend origin.
 
-### 6.2 Standard Endpoints (Target Schema)
-- `GET /api/v1/health`: Healthcheck endpoint returning `{ "status": "ok" }`.
-- `GET /api/v1/places?q={query}`: Autocomplete search for Chennai locations and transit hubs.
-- `POST /api/v1/routes/search`: Core multimodal routing engine.
-  - **Request Body:**
-    ```json
+### 6.2 Standard MVP Endpoints
+
+#### `GET /api/v1/health`
+Healthcheck endpoint returning `{ "status": "ok" }`.
+
+#### `GET /api/v1/places?q={query}`
+Autocomplete search for Chennai localities, metro stations, suburban railway stations, and bus stops.
+
+#### `POST /api/v1/routes/search`
+Core multimodal journey planner endpoint.
+
+**Request Body (MVP Schema):**
+```json
+{
+  "source": "Chennai Central",
+  "destination": "Guindy",
+  "gender": "male",
+  "sort_by": "cost"
+}
+```
+*(Gender is `"male"` or `"female"`. `sort_by` is `"cost"` or `"time"`.)*
+
+**Response Body (MVP Schema):**
+```json
+{
+  "search_id": "search_101",
+  "source": "Chennai Central",
+  "destination": "Guindy",
+  "gender": "male",
+  "sort_by": "cost",
+  "routes": [
     {
-      "origin": { "lat": 13.0827, "lng": 80.2707, "name": "Chennai Central" },
-      "destination": { "lat": 12.9807, "lng": 80.2228, "name": "Guindy" },
-      "gender": "female",
-      "allowed_modes": ["walking", "bus", "metro", "suburban_train", "auto", "share_auto", "taxi"],
-      "departure_time": "2026-11-06T09:00:00"
-    }
-    ```
-  - **Response Body:**
-    ```json
-    {
-      "search_id": "route_12345",
-      "origin": "Chennai Central",
-      "destination": "Guindy",
-      "routes": [
+      "route_id": "route_suburban_direct",
+      "total_fare": 5.0,
+      "total_duration_minutes": 25,
+      "transfers_count": 0,
+      "summary": "Suburban Train from Moore Market Complex to Guindy",
+      "legs": [
         {
-          "route_id": "r_1",
-          "total_fare": 0.0,
-          "total_duration_minutes": 42,
-          "transfers_count": 1,
-          "legs": [
-            {
-              "mode": "walking",
-              "from_name": "Chennai Central Station",
-              "to_name": "Central Bus Stand",
-              "duration_minutes": 5,
-              "distance_meters": 350,
-              "fare": 0.0
-            },
-            {
-              "mode": "bus",
-              "route_number": "18A",
-              "bus_type": "ordinary",
-              "from_name": "Central Bus Stand",
-              "to_name": "Guindy Race Course",
-              "duration_minutes": 37,
-              "distance_meters": 11500,
-              "fare": 0.0,
-              "fare_note": "Free travel under Vidiyal Payana Thittam"
-            }
-          ]
+          "mode": "walking",
+          "from_stop": "Chennai Central",
+          "to_stop": "Moore Market Complex (Suburban)",
+          "duration_minutes": 4,
+          "distance_meters": 250,
+          "fare": 0.0,
+          "fare_type": "verified",
+          "fare_note": "Free walking transfer"
+        },
+        {
+          "mode": "suburban_train",
+          "route_name": "Beach - Tambaram Line",
+          "from_stop": "Moore Market Complex",
+          "to_stop": "Guindy Railway Station",
+          "duration_minutes": 18,
+          "distance_meters": 13000,
+          "fare": 5.0,
+          "fare_type": "verified",
+          "fare_note": "Southern Railway 2nd Class Ordinary Ticket"
+        },
+        {
+          "mode": "walking",
+          "from_stop": "Guindy Railway Station",
+          "to_stop": "Guindy",
+          "duration_minutes": 3,
+          "distance_meters": 200,
+          "fare": 0.0,
+          "fare_type": "verified",
+          "fare_note": "Exit to destination"
         }
       ]
     }
-    ```
+  ]
+}
+```
 
 ### 6.3 Code Quality & Data Contracts
-- FastAPI backend models must be defined with **Pydantic v2** (`BaseModel`).
-- Next.js frontend must mirror backend response types using TypeScript `interface` or `type` definitions in a dedicated types folder (`types/transit.ts`).
+- Backend models defined using **Pydantic v2** (`BaseModel`).
+- Frontend contracts mirroring backend models in `types/transit.ts`.
 - Standard HTTP status codes: `200 OK`, `400 Bad Request`, `422 Unprocessable Entity`, `500 Internal Server Error`.
 
 ---
 
 ## 7. Git Workflow & Branching Policies
-
-All agents and developers contributing to this repository must adhere strictly to these rules:
 
 ### 7.1 Branch Isolation
 - **Frontend work** must be carried out exclusively on the `frontend` branch.
@@ -186,11 +218,11 @@ All agents and developers contributing to this repository must adhere strictly t
   - **Frontend:**
     - Lint check: `npm run lint` / `pnpm lint`
     - Type check: `npx tsc --noEmit`
-    - Test runner: `npm test` (when test suite is established)
+    - Test runner: `npm test`
   - **Backend:**
     - Unit tests: `pytest`
     - Formatting & linting: `flake8` / `ruff`
-- If tests fail, the build fails: resolve all errors before creating commits.
+- If tests fail, resolve all errors before creating commits.
 
 ---
 
@@ -198,7 +230,7 @@ All agents and developers contributing to this repository must adhere strictly t
 
 - [x] Repository initialized with Git and remote tracking.
 - [x] `frontend` branch created and configured.
-- [x] `AGENTS.md` system guidelines established.
-- [ ] Backend skeleton setup (`FastAPI`, initial transit model, pytest).
-- [ ] Frontend skeleton setup (`Next.js`, Tailwind CSS, Leaflet integration).
-- [ ] Fare rules engine & routing pipeline implementation.
+- [x] `AGENTS.md` updated with confirmed MVP UI specifications and data distinctions.
+- [ ] Backend skeleton setup (`FastAPI`, fare rules engine distinguishing verified vs estimated data, pytest).
+- [ ] Frontend MVP setup (`Next.js`, React, Tailwind CSS - Two-page workflow without map).
+- [ ] Post-MVP: Leaflet & OpenStreetMap interactive mapping, mode toggles, departure-time scheduling.
