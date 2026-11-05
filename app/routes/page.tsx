@@ -1,23 +1,23 @@
 'use client';
 
-import React, { Suspense, useState, useEffect, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Navigation,
   MapPin,
   ArrowUpDown,
-  RotateCcw,
   Sparkles,
   ArrowLeft,
   SlidersHorizontal,
   Info,
   ShieldCheck,
   Compass,
+  AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Gender, SortPreference, MultimodalRoute } from '@/types/transit';
-import { SAMPLE_MULTIMODAL_ROUTES } from '@/data/mockRoutes';
-import { processRoutes } from '@/lib/fareEngine';
+import { searchRoutesApi, fetchHealth } from '@/lib/api';
 import { RouteCard } from '@/components/RouteCard';
 import { GenderToggle } from '@/components/GenderToggle';
 import { SortToggle } from '@/components/SortToggle';
@@ -29,17 +29,26 @@ function RoutesContent() {
   const router = useRouter();
 
   // Read URL query parameters
-  const initialSource = searchParams.get('source') || 'Chennai Central (Puratchi Thalaivar Dr. M.G.R.)';
+  const initialSource = searchParams.get('source') || 'Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)';
   const initialDestination = searchParams.get('destination') || 'Guindy';
   const initialGender = (searchParams.get('gender') as Gender) || 'male';
   const initialSort = (searchParams.get('sort') as SortPreference) || 'cost';
+
+  const sLat = searchParams.get('sLat') ? parseFloat(searchParams.get('sLat')!) : undefined;
+  const sLng = searchParams.get('sLng') ? parseFloat(searchParams.get('sLng')!) : undefined;
+  const dLat = searchParams.get('dLat') ? parseFloat(searchParams.get('dLat')!) : undefined;
+  const dLng = searchParams.get('dLng') ? parseFloat(searchParams.get('dLng')!) : undefined;
 
   // State
   const [source, setSource] = useState(initialSource);
   const [destination, setDestination] = useState(initialDestination);
   const [gender, setGender] = useState<Gender>(initialGender);
   const [sortBy, setSortBy] = useState<SortPreference>(initialSort);
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [routes, setRoutes] = useState<MultimodalRoute[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isBackendHealthy, setIsBackendHealthy] = useState<boolean | null>(null);
 
   // Sync state if URL changes
   useEffect(() => {
@@ -49,8 +58,59 @@ function RoutesContent() {
     if (searchParams.get('sort')) setSortBy(searchParams.get('sort') as SortPreference);
   }, [searchParams]);
 
-  // Update URL search parameters when interactive controls change (without full reload)
-  const updateUrlParams = (newGender: Gender, newSort: SortPreference, newSrc = source, newDst = destination) => {
+  // Check health on mount
+  useEffect(() => {
+    fetchHealth().then((health) => {
+      setIsBackendHealthy(health !== null && health.status === 'ok');
+    });
+  }, []);
+
+  // Fetch routes from FastAPI backend
+  const loadRoutes = useCallback(
+    async (
+      src: string,
+      dst: string,
+      g: Gender,
+      sort: SortPreference,
+      srcC?: { lat: number; lng: number },
+      dstC?: { lat: number; lng: number }
+    ) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const results = await searchRoutesApi({
+          source: src,
+          destination: dst,
+          sourceCoords: srcC,
+          destCoords: dstC,
+          gender: g,
+          sortBy: sort,
+        });
+        setRoutes(results);
+      } catch (err: any) {
+        console.error('Failed to load routes from backend:', err);
+        setError(err.message || 'Unable to connect to transit routing engine');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  // Fetch on mount or when key parameters change
+  useEffect(() => {
+    const srcCoords = sLat && sLng ? { lat: sLat, lng: sLng } : undefined;
+    const dstCoords = dLat && dLng ? { lat: dLat, lng: dLng } : undefined;
+    loadRoutes(source, destination, gender, sortBy, srcCoords, dstCoords);
+  }, [source, destination, gender, sortBy, sLat, sLng, dLat, dLng, loadRoutes]);
+
+  // Update URL search parameters when interactive controls change
+  const updateUrlParams = (
+    newGender: Gender,
+    newSort: SortPreference,
+    newSrc = source,
+    newDst = destination
+  ) => {
     const params = new URLSearchParams({
       source: newSrc,
       destination: newDst,
@@ -75,22 +135,8 @@ function RoutesContent() {
     const tempDst = destination;
     setSource(tempDst);
     setDestination(tempSrc);
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 250);
     updateUrlParams(gender, sortBy, tempDst, tempSrc);
   };
-
-  // Dynamically recalculate and sort routes
-  const processedRoutes: MultimodalRoute[] = useMemo(() => {
-    // Generate route copies adjusted to source and destination
-    const baseRoutes = SAMPLE_MULTIMODAL_ROUTES.map((r) => ({
-      ...r,
-      source,
-      destination,
-    }));
-
-    return processRoutes(baseRoutes, gender, sortBy);
-  }, [source, destination, gender, sortBy]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -104,9 +150,28 @@ function RoutesContent() {
           <span>Back to Search</span>
         </Link>
 
-        <div className="text-[11px] font-semibold text-brand-900 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 flex items-center gap-1.5">
-          <Compass size={13} className="text-brand-700" />
-          <span>Chennai Multimodal Engine</span>
+        <div className="flex items-center gap-2">
+          {isBackendHealthy !== null && (
+            <span
+              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                isBackendHealthy
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isBackendHealthy ? 'bg-emerald-600' : 'bg-amber-600'
+                }`}
+              />
+              {isBackendHealthy ? 'FastAPI Connected' : 'Connecting to API'}
+            </span>
+          )}
+
+          <div className="text-[11px] font-semibold text-brand-900 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 flex items-center gap-1.5">
+            <Compass size={13} className="text-brand-700" />
+            <span>Chennai Multimodal Engine</span>
+          </div>
         </div>
       </div>
 
@@ -121,7 +186,7 @@ function RoutesContent() {
               </div>
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm sm:text-base">
                 <Navigation size={16} className="text-rose-600 shrink-0 transform rotate-45" />
-                <span className="truncate">{source}</span>
+                <span className="truncate" title={source}>{source}</span>
               </div>
             </div>
 
@@ -140,7 +205,7 @@ function RoutesContent() {
               </div>
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm sm:text-base">
                 <MapPin size={16} className="text-brand-800 shrink-0" />
-                <span className="truncate">{destination}</span>
+                <span className="truncate" title={destination}>{destination}</span>
               </div>
             </div>
           </div>
@@ -168,7 +233,7 @@ function RoutesContent() {
           <div className="flex items-center gap-2 text-slate-600">
             <SlidersHorizontal size={14} className="text-slate-400" />
             <span>
-              Showing <span className="font-bold text-slate-900">{processedRoutes.length}</span> multimodal options sorted by{' '}
+              Showing <span className="font-bold text-slate-900">{routes.length}</span> multimodal options sorted by{' '}
               <span className="font-bold text-brand-900">{sortBy === 'cost' ? 'Lowest Cost (₹)' : 'Least Time (mins)'}</span>.
             </span>
           </div>
@@ -200,32 +265,54 @@ function RoutesContent() {
 
           <div className="text-xs text-slate-500 hidden sm:flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Verified Fare</span>
+            <span>Verified Official Fare</span>
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ml-2" />
             <span>Calibrated Estimate</span>
           </div>
         </div>
 
+        {/* Error Alert Box */}
+        {error && (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-amber-700 shrink-0" />
+              <div>
+                <span className="font-bold">Backend Connection Notice:</span>{' '}
+                {error}. Please ensure FastAPI is running on{' '}
+                <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">http://localhost:8000</code>.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => loadRoutes(source, destination, gender, sortBy)}
+              className="px-3 py-1 bg-white hover:bg-amber-100 border border-amber-300 rounded-lg font-semibold shrink-0 flex items-center gap-1 transition-colors"
+            >
+              <RotateCcw size={12} />
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Routes List or Loading / Empty States */}
         {isLoading ? (
           <LoadingSkeleton />
-        ) : processedRoutes.length === 0 ? (
+        ) : routes.length === 0 ? (
           <EmptyState
             source={source}
             destination={destination}
             onReset={() => {
-              setSource('Chennai Central (Puratchi Thalaivar Dr. M.G.R.)');
+              setSource('Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)');
               setDestination('Guindy');
             }}
           />
         ) : (
           <div className="space-y-4">
-            {processedRoutes.map((route, index) => (
+            {routes.map((route, index) => (
               <RouteCard
                 key={route.id}
                 route={route}
                 currentGender={gender}
-                isInitiallyExpanded={index === 0} // Expand first card by default
+                isInitiallyExpanded={index === 0}
               />
             ))}
           </div>

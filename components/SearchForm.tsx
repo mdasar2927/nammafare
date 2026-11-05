@@ -9,23 +9,36 @@ import {
   Sparkles,
   Navigation,
   Compass,
+  Loader2,
 } from 'lucide-react';
-import { CHENNAI_LOCATIONS, POPULAR_ROUTES } from '@/data/locations';
-import { Gender, SortPreference } from '@/types/transit';
+import { POPULAR_ROUTES } from '@/data/locations';
+import { Gender, SortPreference, ChennaiLocation } from '@/types/transit';
+import { fetchPlaces } from '@/lib/api';
 import { GenderToggle } from '@/components/GenderToggle';
 import { SortToggle } from '@/components/SortToggle';
 
 export function SearchForm() {
   const router = useRouter();
 
-  const [source, setSource] = useState('Chennai Central (Puratchi Thalaivar Dr. M.G.R.)');
+  const [source, setSource] = useState('Puratchi Thalaivar Dr. M.G.R. Central (Chennai Central)');
+  const [sourceCoords, setSourceCoords] = useState<{ lat: number; lng: number } | null>({
+    lat: 13.0827,
+    lng: 80.2755,
+  });
+
   const [destination, setDestination] = useState('Guindy');
+  const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>({
+    lat: 13.0067,
+    lng: 80.2128,
+  });
+
   const [gender, setGender] = useState<Gender>('male');
   const [sortBy, setSortBy] = useState<SortPreference>('cost');
 
-  const [sourceSuggestions, setSourceSuggestions] = useState<typeof CHENNAI_LOCATIONS>([]);
-  const [destSuggestions, setDestSuggestions] = useState<typeof CHENNAI_LOCATIONS>([]);
+  const [sourceSuggestions, setSourceSuggestions] = useState<ChennaiLocation[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<ChennaiLocation[]>([]);
   const [activeInput, setActiveInput] = useState<'source' | 'destination' | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -40,36 +53,42 @@ export function SearchForm() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSourceChange = (val: string) => {
+  // Fetch suggestions from backend places API
+  const handleSourceChange = async (val: string) => {
     setSource(val);
-    if (val.trim().length > 0) {
-      const filtered = CHENNAI_LOCATIONS.filter((loc) =>
-        loc.name.toLowerCase().includes(val.toLowerCase()) ||
-        (loc.tamilName && loc.tamilName.includes(val))
-      );
-      setSourceSuggestions(filtered);
-    } else {
-      setSourceSuggestions(CHENNAI_LOCATIONS.slice(0, 6));
+    setSourceCoords(null);
+    setIsLoadingSuggestions(true);
+    try {
+      const places = await fetchPlaces(val, 8);
+      setSourceSuggestions(places);
+    } catch {
+      // handled in fetchPlaces fallback
+    } finally {
+      setIsLoadingSuggestions(false);
     }
   };
 
-  const handleDestChange = (val: string) => {
+  const handleDestChange = async (val: string) => {
     setDestination(val);
-    if (val.trim().length > 0) {
-      const filtered = CHENNAI_LOCATIONS.filter((loc) =>
-        loc.name.toLowerCase().includes(val.toLowerCase()) ||
-        (loc.tamilName && loc.tamilName.includes(val))
-      );
-      setDestSuggestions(filtered);
-    } else {
-      setDestSuggestions(CHENNAI_LOCATIONS.slice(0, 6));
+    setDestCoords(null);
+    setIsLoadingSuggestions(true);
+    try {
+      const places = await fetchPlaces(val, 8);
+      setDestSuggestions(places);
+    } catch {
+      // handled in fetchPlaces fallback
+    } finally {
+      setIsLoadingSuggestions(false);
     }
   };
 
   const swapLocations = () => {
-    const temp = source;
+    const tempSrc = source;
+    const tempCoords = sourceCoords;
     setSource(destination);
-    setDestination(temp);
+    setSourceCoords(destCoords);
+    setDestination(tempSrc);
+    setDestCoords(tempCoords);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,12 +102,23 @@ export function SearchForm() {
       sort: sortBy,
     });
 
+    if (sourceCoords) {
+      params.set('sLat', sourceCoords.lat.toString());
+      params.set('sLng', sourceCoords.lng.toString());
+    }
+    if (destCoords) {
+      params.set('dLat', destCoords.lat.toString());
+      params.set('dLng', destCoords.lng.toString());
+    }
+
     router.push(`/routes?${params.toString()}`);
   };
 
   const selectPopularRoute = (src: string, dst: string) => {
     setSource(src);
     setDestination(dst);
+    if (src.includes('Central')) setSourceCoords({ lat: 13.0827, lng: 80.2755 });
+    if (dst.includes('Guindy')) setDestCoords({ lat: 13.0067, lng: 80.2128 });
   };
 
   return (
@@ -120,23 +150,28 @@ export function SearchForm() {
                   type="text"
                   value={source}
                   onChange={(e) => handleSourceChange(e.target.value)}
-                  onFocus={() => {
+                  onFocus={async () => {
                     setActiveInput('source');
-                    setSourceSuggestions(
-                      source ? CHENNAI_LOCATIONS.filter((l) => l.name.toLowerCase().includes(source.toLowerCase())) : CHENNAI_LOCATIONS.slice(0, 6)
-                    );
+                    const places = await fetchPlaces(source || '', 8);
+                    setSourceSuggestions(places);
                   }}
-                  placeholder="e.g. Chennai Central, Koyambedu, Tambaram"
+                  placeholder="Search Chennai stops, stations, or areas"
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 text-sm font-medium rounded-2xl border border-slate-200/90 focus:border-brand-600 focus:ring-4 focus:ring-brand-500/10 transition-all outline-none"
                 />
+                {isLoadingSuggestions && activeInput === 'source' && (
+                  <div className="absolute right-3 text-slate-400">
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                )}
               </div>
 
               {/* Source Autocomplete Dropdown */}
               {activeInput === 'source' && sourceSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-soft-xl border border-rose-100/90 z-30 max-h-64 overflow-y-auto p-2">
-                  <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider">
-                    Chennai Stations & Localities
+                  <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider flex items-center justify-between">
+                    <span>Chennai Places & Transit Stops</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">Theme7 Verified</span>
                   </div>
                   {sourceSuggestions.map((loc) => (
                     <button
@@ -144,21 +179,24 @@ export function SearchForm() {
                       type="button"
                       onClick={() => {
                         setSource(loc.name);
+                        if (loc.lat && loc.lng) {
+                          setSourceCoords({ lat: loc.lat, lng: loc.lng });
+                        }
                         setActiveInput(null);
                       }}
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50/80 transition-colors flex items-center justify-between group"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <MapPin size={15} className="text-brand-600 group-hover:scale-110 transition-transform" />
-                        <div>
-                          <div className="text-xs font-semibold text-slate-800">{loc.name}</div>
-                          {loc.tamilName && (
-                            <div className="text-[11px] text-slate-400">{loc.tamilName}</div>
+                      <div className="flex items-center gap-2.5 truncate mr-2">
+                        <MapPin size={15} className="text-brand-600 shrink-0 group-hover:scale-110 transition-transform" />
+                        <div className="truncate">
+                          <div className="text-xs font-semibold text-slate-800 truncate">{loc.name}</div>
+                          {loc.description && (
+                            <div className="text-[11px] text-slate-400 truncate">{loc.description}</div>
                           )}
                         </div>
                       </div>
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-rose-100 group-hover:text-brand-800">
-                        {loc.hubType}
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0 group-hover:bg-rose-100 group-hover:text-brand-800">
+                        {loc.hubType || loc.category || 'Transit'}
                       </span>
                     </button>
                   ))}
@@ -195,23 +233,28 @@ export function SearchForm() {
                   type="text"
                   value={destination}
                   onChange={(e) => handleDestChange(e.target.value)}
-                  onFocus={() => {
+                  onFocus={async () => {
                     setActiveInput('destination');
-                    setDestSuggestions(
-                      destination ? CHENNAI_LOCATIONS.filter((l) => l.name.toLowerCase().includes(destination.toLowerCase())) : CHENNAI_LOCATIONS.slice(0, 6)
-                    );
+                    const places = await fetchPlaces(destination || '', 8);
+                    setDestSuggestions(places);
                   }}
-                  placeholder="e.g. Guindy, Velachery, Chennai Airport"
+                  placeholder="Search Chennai stops, stations, or areas"
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 text-sm font-medium rounded-2xl border border-slate-200/90 focus:border-brand-600 focus:ring-4 focus:ring-brand-500/10 transition-all outline-none"
                 />
+                {isLoadingSuggestions && activeInput === 'destination' && (
+                  <div className="absolute right-3 text-slate-400">
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                )}
               </div>
 
               {/* Destination Autocomplete Dropdown */}
               {activeInput === 'destination' && destSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-soft-xl border border-rose-100/90 z-30 max-h-64 overflow-y-auto p-2">
-                  <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider">
-                    Chennai Stations & Localities
+                  <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider flex items-center justify-between">
+                    <span>Chennai Places & Transit Stops</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">Theme7 Verified</span>
                   </div>
                   {destSuggestions.map((loc) => (
                     <button
@@ -219,21 +262,24 @@ export function SearchForm() {
                       type="button"
                       onClick={() => {
                         setDestination(loc.name);
+                        if (loc.lat && loc.lng) {
+                          setDestCoords({ lat: loc.lat, lng: loc.lng });
+                        }
                         setActiveInput(null);
                       }}
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50/80 transition-colors flex items-center justify-between group"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <MapPin size={15} className="text-brand-600 group-hover:scale-110 transition-transform" />
-                        <div>
-                          <div className="text-xs font-semibold text-slate-800">{loc.name}</div>
-                          {loc.tamilName && (
-                            <div className="text-[11px] text-slate-400">{loc.tamilName}</div>
+                      <div className="flex items-center gap-2.5 truncate mr-2">
+                        <MapPin size={15} className="text-brand-600 shrink-0 group-hover:scale-110 transition-transform" />
+                        <div className="truncate">
+                          <div className="text-xs font-semibold text-slate-800 truncate">{loc.name}</div>
+                          {loc.description && (
+                            <div className="text-[11px] text-slate-400 truncate">{loc.description}</div>
                           )}
                         </div>
                       </div>
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-rose-100 group-hover:text-brand-800">
-                        {loc.hubType}
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0 group-hover:bg-rose-100 group-hover:text-brand-800">
+                        {loc.hubType || loc.category || 'Transit'}
                       </span>
                     </button>
                   ))}
