@@ -15,11 +15,23 @@ router = APIRouter()
 def get_health():
     loader = TransitDataLoader.get_instance()
     is_loaded = len(loader.places_index) > 0
-    return HealthResponse(status="ok", version="1.0.0", data_loaded=is_loaded)
+    return HealthResponse(
+        status="ok",
+        version="1.0.0",
+        data_loaded=is_loaded,
+        theme7_bus_stops_count=len(loader.bus_stops),
+        theme7_bus_routes_count=len(loader.bus_routes),
+        theme7_metro_corridors_count=len(loader.metro_corridors),
+        theme7_metro_stations_count=len(loader.metro_stations),
+        theme7_suburban_tracks_count=len(loader.suburban_tracks),
+        theme7_suburban_stations_count=len(loader.suburban_stations),
+        theme7_taz_zones_count=len(loader.taz_zones),
+        theme7_road_links_count=len(loader.road_network),
+    )
 
 @router.get("/places", response_model=List[Place])
 def get_places(
-    q: Optional[str] = Query(None, description="Search query for Chennai places or stops"),
+    q: Optional[str] = Query(None, description="Search query for actual Theme7 places, stations or stops"),
     limit: int = Query(10, ge=1, le=50, description="Max results to return")
 ):
     loader = TransitDataLoader.get_instance()
@@ -31,7 +43,7 @@ def get_places(
             category=p["category"],
             lat=p["lat"],
             lng=p["lng"],
-            source=p.get("source", "theme7"),
+            source=p.get("source", "Theme7"),
             description=p.get("description"),
         )
         for p in results

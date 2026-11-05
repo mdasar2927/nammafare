@@ -6,16 +6,24 @@ from app.services.data_loader import TransitDataLoader
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Preload Theme7 dataset into memory on startup
-    print("Preloading Theme7 transport dataset...")
+    print("Preloading complete Theme7 transport dataset into memory...")
     loader = TransitDataLoader.get_instance()
-    print(f"Loaded {len(loader.bus_stops)} bus stops, {len(loader.bus_routes)} bus routes, and {len(loader.places_index)} indexed places.")
+    print(
+        f"Theme7 Loaded: {len(loader.bus_stops)} bus stops, "
+        f"{len(loader.bus_routes)} bus routes, "
+        f"{len(loader.metro_corridors)} metro corridors, "
+        f"{len(loader.metro_stations)} metro stations, "
+        f"{len(loader.suburban_tracks)} suburban tracks, "
+        f"{len(loader.suburban_stations)} suburban stations, "
+        f"{len(loader.road_network)} road links, "
+        f"{len(loader.taz_zones)} TAZ zones."
+    )
     yield
 
 app = FastAPI(
-    title="NammaFare Backend API",
-    description="Multimodal Chennai Journey Planner & Fare Transparency Engine",
-    version="1.0.0",
+    title="NammaFare Pure Data-Driven Transit Engine",
+    description="Chennai Multimodal Journey Planner derived strictly from Theme7 Public Transport Datasets",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -34,9 +42,10 @@ app.include_router(api_v1_router, prefix="/api/v1")
 @app.get("/")
 def root():
     return {
-        "message": "NammaFare Chennai Multimodal API is running.",
+        "message": "NammaFare Pure Data-Driven Transit Engine is active.",
         "docs_url": "/docs",
-        "api_v1_prefix": "/api/v1"
+        "api_v1_prefix": "/api/v1",
+        "data_policy": "STRICT - 100% Theme7 Derived Data Only"
     }
 
 if __name__ == "__main__":
