@@ -12,6 +12,17 @@ import {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export interface LocationSuggestionItem {
+  id: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  source: 'Theme7' | 'OpenStreetMap' | 'GPS' | string;
+  description?: string;
+  group: 'transit' | 'places';
+}
+
 /**
  * Check backend health status and loaded Theme7 layers
  */
@@ -80,7 +91,127 @@ export async function fetchPlaces(query: string, limit = 8): Promise<ChennaiLoca
 }
 
 /**
- * Resolve coordinates for a given place name using actual Theme7 places index
+ * Reverse geocode latitude and longitude into a readable location name
+ */
+export async function reverseGeocodeCoords(
+  lat: number,
+  lng: number
+): Promise<{ name: string; displayName: string; lat: number; lng: number }> {
+  try {
+    const res = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        name: data.name || `Point (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+        displayName: data.displayName || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`,
+        lat,
+        lng,
+      };
+    }
+  } catch (err) {
+    console.warn('Reverse geocode fetch failed:', err);
+  }
+
+  // Graceful fallback to raw coordinates
+  return {
+    name: `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+    displayName: `Coordinates: ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    lat,
+    lng,
+  };
+}
+
+/**
+ * Unified location search combining:
+ * 1. Theme7 MTC Bus Stops, Metro Stations, Suburban Rail
+ * 2. OpenStreetMap Landmarks, Addresses, and Places across Chennai
+ */
+export async function searchUnifiedLocations(
+  query: string
+): Promise<{ transit: LocationSuggestionItem[]; places: LocationSuggestionItem[] }> {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length < 2) {
+    // Return default transit hubs from backend
+    const defaultTheme7 = await fetchPlaces('', 6);
+    return {
+      transit: defaultTheme7.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.hubType || 'Public Transit',
+        lat: p.lat || 13.0827,
+        lng: p.lng || 80.2755,
+        source: 'Theme7',
+        description: p.description || 'Theme7 GIS Network',
+        group: 'transit',
+      })),
+      places: [],
+    };
+  }
+
+  // Fetch in parallel: Theme7 dataset from FastAPI and OSM Geocoding from Next.js route
+  const [theme7Res, osmRes] = await Promise.allSettled([
+    fetchPlaces(trimmed, 6),
+    fetch(`/api/geocode/search?q=${encodeURIComponent(trimmed)}`).then((r) =>
+      r.ok ? r.json() : []
+    ),
+  ]);
+
+  const transitItems: LocationSuggestionItem[] = [];
+  const placeItems: LocationSuggestionItem[] = [];
+  const seenCoords = new Set<string>();
+
+  if (theme7Res.status === 'fulfilled' && Array.isArray(theme7Res.value)) {
+    for (const p of theme7Res.value) {
+      if (typeof p.lat === 'number' && typeof p.lng === 'number') {
+        const key = `${p.lat.toFixed(4)}_${p.lng.toFixed(4)}`;
+        if (!seenCoords.has(key)) {
+          seenCoords.add(key);
+          transitItems.push({
+            id: p.id,
+            name: p.name,
+            category: p.hubType || 'Public Transit',
+            lat: p.lat,
+            lng: p.lng,
+            source: 'Theme7',
+            description: p.description || 'Theme7 Official Transit Stop',
+            group: 'transit',
+          });
+        }
+      }
+    }
+  }
+
+  if (osmRes.status === 'fulfilled' && Array.isArray(osmRes.value)) {
+    for (const p of osmRes.value) {
+      if (typeof p.lat === 'number' && typeof p.lng === 'number') {
+        const key = `${p.lat.toFixed(4)}_${p.lng.toFixed(4)}`;
+        if (!seenCoords.has(key)) {
+          seenCoords.add(key);
+          placeItems.push({
+            id: p.id,
+            name: p.name,
+            category: p.category || 'Landmark / Address',
+            lat: p.lat,
+            lng: p.lng,
+            source: 'OpenStreetMap',
+            description: p.description || 'Chennai Landmark / Area',
+            group: 'places',
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    transit: transitItems,
+    places: placeItems,
+  };
+}
+
+/**
+ * Resolve coordinates for a given place name
  */
 export async function resolveCoordinates(
   placeName: string
@@ -90,6 +221,15 @@ export async function resolveCoordinates(
     if (places && places.length > 0 && typeof places[0].lat === 'number' && typeof places[0].lng === 'number') {
       return { lat: places[0].lat, lng: places[0].lng };
     }
+
+    // Try OSM geocoder
+    const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(placeName)}`);
+    if (res.ok) {
+      const osmPlaces = await res.json();
+      if (osmPlaces && osmPlaces.length > 0 && typeof osmPlaces[0].lat === 'number') {
+        return { lat: osmPlaces[0].lat, lng: osmPlaces[0].lng };
+      }
+    }
   } catch {
     // handled below
   }
@@ -97,7 +237,7 @@ export async function resolveCoordinates(
 }
 
 /**
- * Map backend mode string to supported TransitMode (only walking, mtc_bus, metro, suburban_train)
+ * Map backend mode string to supported TransitMode
  */
 function mapBackendMode(mode: string): TransitMode {
   const m = mode.toLowerCase().trim();
@@ -145,7 +285,7 @@ export async function searchRoutesApi(
   if (!originCoords || !destinationCoords) {
     return {
       routes: [],
-      message: `Could not determine geospatial coordinates for "${!originCoords ? source : destination}". Please select a location from the autocomplete list.`,
+      message: `Could not determine geospatial coordinates for "${!originCoords ? source : destination}". Please pick a location from the autocomplete list or the interactive map.`,
     };
   }
 

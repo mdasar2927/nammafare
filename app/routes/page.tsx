@@ -108,8 +108,13 @@ function RoutesContent() {
 
   // Fetch on mount or when key parameters change
   useEffect(() => {
-    const srcCoords = sLat && sLng ? { lat: sLat, lng: sLng } : undefined;
-    const dstCoords = dLat && dLng ? { lat: dLat, lng: dLng } : undefined;
+    const srcCoords = typeof sLat === 'number' && typeof sLng === 'number' && !isNaN(sLat) && !isNaN(sLng)
+      ? { lat: sLat, lng: sLng }
+      : undefined;
+    const dstCoords = typeof dLat === 'number' && typeof dLng === 'number' && !isNaN(dLat) && !isNaN(dLng)
+      ? { lat: dLat, lng: dLng }
+      : undefined;
+
     loadRoutes(source, destination, gender, sortBy, srcCoords, dstCoords);
   }, [source, destination, gender, sortBy, sLat, sLng, dLat, dLng, loadRoutes]);
 
@@ -118,7 +123,11 @@ function RoutesContent() {
     newGender: Gender,
     newSort: SortPreference,
     newSrc = source,
-    newDst = destination
+    newDst = destination,
+    newSLat = sLat,
+    newSLng = sLng,
+    newDLat = dLat,
+    newDLng = dLng
   ) => {
     const params = new URLSearchParams({
       source: newSrc,
@@ -126,6 +135,14 @@ function RoutesContent() {
       gender: newGender,
       sort: newSort,
     });
+    if (typeof newSLat === 'number' && typeof newSLng === 'number') {
+      params.set('sLat', newSLat.toString());
+      params.set('sLng', newSLng.toString());
+    }
+    if (typeof newDLat === 'number' && typeof newDLng === 'number') {
+      params.set('dLat', newDLat.toString());
+      params.set('dLng', newDLng.toString());
+    }
     router.replace(`/routes?${params.toString()}`, { scroll: false });
   };
 
@@ -142,9 +159,23 @@ function RoutesContent() {
   const handleSwap = () => {
     const tempSrc = source;
     const tempDst = destination;
+    const tempSLat = sLat;
+    const tempSLng = sLng;
+    const tempDLat = dLat;
+    const tempDLng = dLng;
+
     setSource(tempDst);
     setDestination(tempSrc);
-    updateUrlParams(gender, sortBy, tempDst, tempSrc);
+    updateUrlParams(
+      gender,
+      sortBy,
+      tempDst,
+      tempSrc,
+      tempDLat,
+      tempDLng,
+      tempSLat,
+      tempSLng
+    );
   };
 
   return (
