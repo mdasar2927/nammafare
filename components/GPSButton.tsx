@@ -38,7 +38,6 @@ export function GPSButton({
         const { latitude, longitude } = pos.coords;
 
         try {
-          // Attempt reverse geocoding
           const geo = await reverseGeocodeCoords(latitude, longitude);
           onLocationDetected({
             name: geo.name || `Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
@@ -47,7 +46,6 @@ export function GPSButton({
             source: 'GPS',
           });
         } catch {
-          // Fallback to raw coordinates
           onLocationDetected({
             name: `Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
             lat: latitude,
@@ -87,7 +85,7 @@ export function GPSButton({
           onClick={handleGetLocation}
           disabled={isLoading}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100/90 active:bg-rose-200 rounded-xl border border-rose-200/80 transition-all shadow-sm ${className}`}
-          title="Use your device's live GPS coordinates"
+          title="Use Current Location"
         >
           {isLoading ? (
             <Loader2 size={13} className="animate-spin text-rose-600" />
@@ -101,13 +99,13 @@ export function GPSButton({
           type="button"
           onClick={handleGetLocation}
           disabled={isLoading}
-          className={`p-2 rounded-xl text-slate-500 hover:text-brand-900 hover:bg-rose-50/80 transition-colors ${className}`}
-          title="Use my current GPS location"
+          className={`p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all ${className}`}
+          title="Use Current Location"
         >
           {isLoading ? (
-            <Loader2 size={16} className="animate-spin text-rose-600" />
+            <Loader2 size={20} className="animate-spin text-rose-600" />
           ) : (
-            <Crosshair size={16} className="text-slate-600 hover:text-brand-800" />
+            <Crosshair size={20} />
           )}
         </button>
       )}

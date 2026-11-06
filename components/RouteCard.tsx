@@ -2,19 +2,15 @@
 
 import React, { useState } from 'react';
 import { MultimodalRoute, Gender } from '@/types/transit';
-import { RouteLegItem } from '@/components/RouteLegItem';
-import { TransitIcon, getModeBadgeDetails } from '@/components/TransitIcon';
 import {
   ChevronDown,
-  ChevronUp,
   Clock,
-  IndianRupee,
-  ShieldCheck,
-  Sparkles,
   ArrowRight,
-  TrendingDown,
-  Zap,
-  Database,
+  Bus,
+  Footprints,
+  Train,
+  TrainFront,
+  MapPin,
 } from 'lucide-react';
 
 interface RouteCardProps {
@@ -35,181 +31,183 @@ export function RouteCard({
     currentGender === 'female' &&
     route.legs.some((l) => l.isVidiyalEligible);
 
-  // Check verified status
-  const isRouteVerified = route.isVerified || route.hasVerifiedFaresOnly;
-
   return (
     <div
-      className={`bg-white rounded-3xl border transition-all duration-200 overflow-hidden ${
+      className={`bg-white rounded-2xl border transition-all duration-300 cursor-pointer animate-stagger-3 group ${
         isExpanded
-          ? 'border-brand-700/40 shadow-soft-lg ring-1 ring-brand-700/10'
-          : 'border-rose-100/90 shadow-soft-sm hover:shadow-soft-md hover:border-brand-300'
+          ? 'border-rose-200 shadow-md'
+          : 'border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md'
       }`}
+      onClick={() => setIsExpanded(!isExpanded)}
     >
-      {/* Top Banner */}
-      <div className="flex items-center justify-between px-6 pt-4 pb-2 border-b border-slate-100 bg-gradient-to-r from-rose-50/40 via-white to-transparent">
-        <div className="flex flex-wrap items-center gap-2">
-          {route.highlightBadge === 'Cheapest' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-              <TrendingDown size={13} />
-              Lowest Fare
+      <div className="p-6">
+        {/* Top Badges & Expand Arrow */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {route.highlightBadge === 'Cheapest' && (
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                Lowest Fare
+              </span>
+            )}
+            {route.highlightBadge === 'Fastest' && (
+              <span className="bg-sky-50 text-sky-700 border border-sky-100 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                Fastest ETA
+              </span>
+            )}
+            <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium">
+              {route.isVerified ? 'Official Fare' : 'Derived Route'}
             </span>
-          )}
-          {route.highlightBadge === 'Fastest' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
-              <Zap size={13} />
-              Fastest ETA
-            </span>
-          )}
-          {route.highlightBadge === 'Balanced' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
-              <Sparkles size={13} />
-              Recommended
-            </span>
-          )}
-
-          {isRouteVerified ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              <ShieldCheck size={12} />
-              Official Government Fare
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200">
-              Derived Transit Route
-            </span>
-          )}
-
-          {route.provenance && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
-              <Database size={10} />
-              Theme7 Network
-            </span>
-          )}
+            {hasVidiyalBenefit && (
+              <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                Vidiyal Scheme (₹0 MTC)
+              </span>
+            )}
+          </div>
+          <div
+            className={`p-1.5 rounded-full transition-transform duration-300 ${
+              isExpanded
+                ? 'rotate-180 bg-slate-100 text-slate-800'
+                : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100 group-hover:text-slate-800'
+            }`}
+          >
+            <ChevronDown size={20} />
+          </div>
         </div>
 
-        {hasVidiyalBenefit && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-900 bg-rose-100/80 px-2.5 py-0.5 rounded-full border border-brand-200 animate-pulse">
-            <Sparkles size={12} className="text-brand-600" />
-            Vidiyal Scheme (₹0 MTC)
-          </span>
-        )}
-      </div>
+        {/* Content: Summary, Visual Path, Duration & Fare */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900 mb-3">{route.summary}</h3>
 
-      {/* Main Card Summary (Click to expand) */}
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full text-left p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 cursor-pointer focus:outline-none"
-        aria-expanded={isExpanded}
-      >
-        {/* Left Column: Summary & Mode Sequence */}
-        <div className="flex-1 space-y-3">
-          <div className="space-y-1">
-            <h3 className="font-bold text-slate-900 text-base sm:text-lg group-hover:text-brand-900 transition-colors">
-              {route.summary}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {route.transfersCount === 0
-                ? 'Direct Route • No Transfers'
-                : `${route.transfersCount} Transit Transfer${
-                    route.transfersCount > 1 ? 's' : ''
-                  }`}
-            </p>
-          </div>
-
-          {/* Mode Pill Flow */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {route.legs.map((leg, idx) => {
-              const details = getModeBadgeDetails(leg.mode);
-              return (
-                <React.Fragment key={leg.id}>
-                  <div
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border ${details.bgClass} ${details.borderClass} ${details.textClass}`}
-                  >
-                    <TransitIcon mode={leg.mode} size={14} />
-                    <span>
-                      {leg.routeNumber ? `Route ${leg.routeNumber}` : details.label}
-                    </span>
-                    <span className="text-[10px] opacity-75 font-normal">
-                      ({leg.durationMinutes}m)
-                    </span>
-                  </div>
-
+            {/* Visual Path */}
+            <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
+              {route.legs.map((leg, idx) => (
+                <React.Fragment key={leg.id || idx}>
+                  {leg.mode === 'walking' ? (
+                    <div className="flex items-center gap-1.5 text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                      <Footprints size={16} /> {leg.durationMinutes}m
+                    </div>
+                  ) : leg.mode === 'mtc_bus' ? (
+                    <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">
+                      <Bus size={16} /> {leg.durationMinutes}m
+                    </div>
+                  ) : leg.mode === 'metro' ? (
+                    <div className="flex items-center gap-1.5 text-sky-700 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-100">
+                      <Train size={16} /> {leg.durationMinutes}m
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                      <TrainFront size={16} /> {leg.durationMinutes}m
+                    </div>
+                  )}
                   {idx < route.legs.length - 1 && (
-                    <ArrowRight size={13} className="text-slate-300 shrink-0" />
+                    <ArrowRight size={14} className="text-slate-300" />
                   )}
                 </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8 md:text-right shrink-0 bg-slate-50 md:bg-transparent p-4 md:p-0 rounded-xl">
+            <div>
+              <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium uppercase tracking-wider mb-1 md:justify-end">
+                <Clock size={14} /> Duration
+              </div>
+              <div className="text-2xl font-bold text-slate-800">
+                {route.totalDurationMinutes}
+                <span className="text-sm font-medium text-slate-500 ml-1">mins</span>
+              </div>
+            </div>
+            <div className="w-px h-10 bg-slate-200 md:hidden"></div>
+            <div>
+              <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1 md:justify-end">
+                Total Fare
+              </div>
+              <div className="text-2xl font-bold text-rose-600">
+                ₹{route.calculatedTotalFare}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 p-6 rounded-b-2xl animate-details">
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">
+            Step-by-Step Itinerary
+          </h4>
+
+          <div className="relative pl-6 border-l-2 border-slate-200 flex flex-col gap-8 ml-2">
+            {route.legs.map((leg, index) => {
+              const isWalking = leg.mode === 'walking';
+              const isBus = leg.mode === 'mtc_bus';
+              const isMetro = leg.mode === 'metro';
+
+              let legTitle = '';
+              if (isWalking) {
+                legTitle = `Walk to ${leg.toStop}`;
+              } else if (isBus) {
+                legTitle = `Board MTC Route ${leg.routeNumber || leg.serviceType || 'Bus'}`;
+              } else if (isMetro) {
+                legTitle = `Board Chennai Metro: ${leg.serviceType || 'Metro Rail'}`;
+              } else {
+                legTitle = `Board Southern Railway: ${leg.serviceType || 'Suburban Train'}`;
+              }
+
+              return (
+                <div key={leg.id || index} className="relative">
+                  <div
+                    className={`absolute top-0 bg-white border-2 rounded-full ${
+                      isWalking
+                        ? 'border-slate-200 text-slate-500 p-1.5 -left-[1.85rem]'
+                        : isBus
+                        ? 'border-rose-200 text-rose-500 p-2 -left-[1.95rem]'
+                        : isMetro
+                        ? 'border-sky-200 text-sky-500 p-2 -left-[1.95rem]'
+                        : 'border-indigo-200 text-indigo-500 p-2 -left-[1.95rem]'
+                    }`}
+                  >
+                    {isWalking && <Footprints size={16} />}
+                    {isBus && <Bus size={18} />}
+                    {isMetro && <Train size={18} />}
+                    {!isWalking && !isBus && !isMetro && <TrainFront size={18} />}
+                  </div>
+                  <div className="-mt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <h5 className="font-semibold text-slate-800">{legTitle}</h5>
+                      <span
+                        className={`text-sm font-medium px-2 py-0.5 rounded ${
+                          leg.fare === 0
+                            ? 'text-emerald-600 bg-emerald-50'
+                            : 'text-rose-700 bg-rose-50 border border-rose-100'
+                        }`}
+                      >
+                        ₹{leg.fare} {leg.isVerified ? 'Official' : ''}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-2">
+                      {leg.fromStop} <ArrowRight size={12} className="inline mx-1" /> {leg.toStop}
+                    </p>
+                    <span className="text-xs text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded-md">
+                      {leg.durationMinutes} mins
+                      {leg.distanceMeters > 0 ? ` • ${leg.distanceMeters}m` : ''}
+                    </span>
+                  </div>
+                </div>
               );
             })}
-          </div>
-        </div>
 
-        {/* Right Column: Fare, Duration & Toggle */}
-        <div className="flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
-          {/* Duration */}
-          <div className="text-left md:text-right">
-            <div className="text-xs font-medium text-slate-500 flex items-center md:justify-end gap-1">
-              <Clock size={13} />
-              <span>Duration</span>
+            {/* Final Destination Step */}
+            <div className="relative">
+              <div className="absolute -left-[1.85rem] top-0 bg-white border-2 border-slate-200 text-rose-600 p-1.5 rounded-full">
+                <MapPin size={16} />
+              </div>
+              <div className="-mt-1">
+                <h5 className="font-semibold text-slate-800">Arrive at Destination</h5>
+                <p className="text-sm text-slate-500 mt-1">{route.destination}</p>
+              </div>
             </div>
-            <div className="font-black text-slate-900 text-lg sm:text-xl">
-              {route.totalDurationMinutes}{' '}
-              <span className="text-xs font-semibold text-slate-500">mins</span>
-            </div>
-          </div>
-
-          {/* Total Fare */}
-          <div className="text-left md:text-right min-w-[90px]">
-            <div className="text-xs font-medium text-slate-500 flex items-center md:justify-end gap-1">
-              <IndianRupee size={13} />
-              <span>Total Fare</span>
-            </div>
-            <div className="font-black text-xl sm:text-2xl text-brand-900 flex items-center md:justify-end">
-              <span>₹{route.calculatedTotalFare}</span>
-            </div>
-          </div>
-
-          {/* Expand Chevron */}
-          <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-brand-900 hover:bg-rose-50 transition-colors shrink-0">
-            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded Step-by-Step Breakdown */}
-      {isExpanded && (
-        <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50/30">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-slate-700 tracking-wider uppercase">
-              Step-by-Step Itinerary & Data Provenance
-            </span>
-            <span className="text-xs text-slate-500">
-              Click to collapse
-            </span>
-          </div>
-
-          <div className="space-y-0">
-            {route.legs.map((leg, index) => (
-              <RouteLegItem
-                key={leg.id}
-                leg={leg}
-                stepNumber={index + 1}
-                isLast={index === route.legs.length - 1}
-              />
-            ))}
-          </div>
-
-          {/* Disclaimers & Provenance Box */}
-          <div className="mt-4 p-3 rounded-xl bg-white border border-rose-100 text-[11px] text-slate-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-              <span>
-                Derived from official Chennai Theme7 GIS datasets. Stop names & station codes are preserved without fabrication.
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono">
-              Route ID: {route.id}
-            </span>
           </div>
         </div>
       )}

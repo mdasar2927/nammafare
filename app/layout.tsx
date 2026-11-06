@@ -6,7 +6,7 @@ import { Footer } from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'NammaFare | Chennai Multimodal Journey Planner & Fare Estimator',
   description:
-    'Compare real-time travel times and transparent fare estimates across MTC Buses, Chennai Metro, Suburban Trains, Auto Rickshaws, and Cabs.',
+    'Compare real-time travel times and transparent fare estimates across MTC Buses, Chennai Metro, and Suburban Trains.',
   keywords: [
     'Chennai transit',
     'NammaFare',
@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="flex flex-col min-h-screen bg-[#fcf9fa] text-slate-900 antialiased selection:bg-rose-200 selection:text-brand-900">
+      <body className="flex flex-col min-h-screen bg-[#F8F9FA] text-slate-800 antialiased selection:bg-rose-100 selection:text-rose-900">
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

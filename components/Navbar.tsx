@@ -1,44 +1,43 @@
 import React from 'react';
 import Link from 'next/link';
-import { Compass, Train, ShieldCheck } from 'lucide-react';
+import { Compass, CheckCircle2, Plus, LayoutDashboard } from 'lucide-react';
 
 export function Navbar() {
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-rose-100/80 shadow-soft-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-900 via-brand-800 to-rose-600 flex items-center justify-center text-white shadow-md shadow-brand-900/20 group-hover:scale-105 transition-transform">
-            <Compass size={22} className="text-white" />
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">
-                Namma<span className="text-brand-800">Fare</span>
-              </span>
-              <span className="bg-rose-50 text-brand-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-200">
-                CHENNAI
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-500 font-medium -mt-1 hidden sm:inline">
-              சென்னை வழித்தடம் & கட்டண வழிகாட்டி
-            </span>
-          </div>
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 px-4 sm:px-6 py-4 flex items-center justify-between">
+      <Link href="/" className="flex items-center gap-2 cursor-pointer group">
+        <div className="bg-rose-700 p-2 rounded-xl text-white shadow-sm group-hover:bg-rose-800 transition-colors">
+          <Compass size={20} strokeWidth={2.5} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 leading-none">
+            NammaFare <span className="text-rose-700 text-[10px] uppercase tracking-widest font-bold align-top ml-1">Chennai</span>
+          </h1>
+        </div>
+      </Link>
+
+      <div className="flex items-center gap-3">
+        <span className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+          <CheckCircle2 size={14} /> Official Fares
+        </span>
+
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 px-4 py-2 rounded-full transition-all shadow-sm"
+        >
+          <Plus size={16} /> New Journey
         </Link>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200/80 text-xs text-slate-600">
-            <ShieldCheck size={14} className="text-emerald-600" />
-            <span>MTC & CMRL Verified Fare Standards</span>
-          </div>
-
-          <Link
-            href="/"
-            className="text-xs font-semibold text-brand-900 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-rose-50/80 transition-colors flex items-center gap-1.5"
-          >
-            <Train size={14} />
-            <span>New Journey</span>
-          </Link>
-        </div>
+        <a
+          href="https://admin-panel-mauve-nu.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 px-4 py-2 rounded-full transition-all shadow-sm"
+          title="Open Admin Panel"
+        >
+          <LayoutDashboard size={15} />
+          <span>Admin</span>
+        </a>
       </div>
     </header>
   );

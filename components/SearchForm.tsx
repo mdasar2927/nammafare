@@ -2,33 +2,37 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Search, Sparkles, Compass } from 'lucide-react';
-import { POPULAR_ROUTES } from '@/data/locations';
+import { ArrowUpDown, Search, Navigation } from 'lucide-react';
 import { Gender, SortPreference } from '@/types/transit';
 import { resolveCoordinates } from '@/lib/api';
 import { LocationInput } from '@/components/LocationInput';
-import { GenderToggle } from '@/components/GenderToggle';
-import { SortToggle } from '@/components/SortToggle';
 
 export function SearchForm() {
   const router = useRouter();
 
-  const [source, setSource] = useState('Central Dental College');
-  const [sourceCoords, setSourceCoords] = useState<{ lat: number; lng: number } | null>({
-    lat: 13.0828,
-    lng: 80.2822,
-  });
-  const [sourceType, setSourceType] = useState<string | undefined>('Theme7 Stop');
+  // Fresh homepage visit starts with both origin and destination empty and no coordinates
+  const [source, setSource] = useState('');
+  const [sourceCoords, setSourceCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [sourceType, setSourceType] = useState<string | undefined>(undefined);
 
-  const [destination, setDestination] = useState('Guindy B.T');
-  const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>({
-    lat: 13.0092,
-    lng: 80.2108,
-  });
-  const [destType, setDestType] = useState<string | undefined>('Theme7 Stop');
+  const [destination, setDestination] = useState('');
+  const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [destType, setDestType] = useState<string | undefined>(undefined);
 
-  const [gender, setGender] = useState<Gender>('male');
-  const [sortBy, setSortBy] = useState<SortPreference>('cost');
+  const [gender, setGender] = useState<Gender>('male'); // 'male' = General, 'female' = Women scheme
+  const [sortBy, setSortBy] = useState<SortPreference>('cost'); // 'cost' = Lowest Cost, 'time' = Least Time
+
+  // Form is valid only after both locations have non-empty text and resolved coordinates
+  const isFormValid = Boolean(
+    source.trim() &&
+    destination.trim() &&
+    sourceCoords &&
+    typeof sourceCoords.lat === 'number' &&
+    typeof sourceCoords.lng === 'number' &&
+    destCoords &&
+    typeof destCoords.lat === 'number' &&
+    typeof destCoords.lng === 'number'
+  );
 
   const handleSourceChange = (
     val: string,
@@ -66,23 +70,18 @@ export function SearchForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!source.trim() || !destination.trim()) return;
+    if (!isFormValid || !sourceCoords || !destCoords) return;
 
     const params = new URLSearchParams({
       source: source.trim(),
       destination: destination.trim(),
       gender,
       sort: sortBy,
+      sLat: sourceCoords.lat.toString(),
+      sLng: sourceCoords.lng.toString(),
+      dLat: destCoords.lat.toString(),
+      dLng: destCoords.lng.toString(),
     });
-
-    if (sourceCoords) {
-      params.set('sLat', sourceCoords.lat.toString());
-      params.set('sLng', sourceCoords.lng.toString());
-    }
-    if (destCoords) {
-      params.set('dLat', destCoords.lat.toString());
-      params.set('dLng', destCoords.lng.toString());
-    }
 
     router.push(`/routes?${params.toString()}`);
   };
@@ -104,90 +103,163 @@ export function SearchForm() {
   };
 
   return (
-    <div className="w-full">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-3xl p-6 sm:p-8 shadow-soft-xl border border-rose-100/90 relative"
-      >
-        {/* Glow Header Accent */}
-        <div className="absolute top-0 inset-x-8 h-1 bg-gradient-to-r from-brand-700 via-rose-500 to-brand-900 rounded-t-full" />
+    <div className="w-full flex flex-col items-center">
+      {/* Central Search Card */}
+      <div className="w-full max-w-2xl bg-white p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 relative">
+        <form onSubmit={handleSubmit}>
+          {/* Inputs Section */}
+          <div className="relative flex flex-col gap-3 mb-8">
+            {/* Visual connector line between icons */}
+            <div className="absolute left-[1.35rem] top-10 bottom-10 w-0.5 bg-slate-100 z-0 pointer-events-none" />
 
-        <div className="flex flex-col gap-6">
-          {/* Inputs Section: Origin, Swap Button, Destination */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto,1fr] items-start gap-4 relative">
-            {/* Origin Location Input */}
+            {/* Starting Point Input */}
             <LocationInput
-              id="source-input"
-              label="Starting Point (Origin)"
-              placeholder="Search stop, address, landmark, or pick on map"
+              id="start-point"
+              iconType="origin"
+              placeholder="Starting Point (Origin)"
               value={source}
               coords={sourceCoords}
               sourceType={sourceType}
-              iconType="origin"
               onChange={handleSourceChange}
             />
 
             {/* Swap Button */}
-            <div className="flex justify-center my-0 lg:pt-8">
+            <div className="absolute left-[0.8rem] top-1/2 -translate-y-1/2 z-20 flex justify-center w-8">
               <button
                 type="button"
                 onClick={swapLocations}
-                title="Swap origin and destination"
-                className="w-10 h-10 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-brand-800 flex items-center justify-center transition-all hover:rotate-180 duration-300 shadow-sm"
+                className="bg-white p-1.5 rounded-full border border-slate-200 shadow-sm text-slate-400 hover:text-rose-600 hover:border-rose-200 transition-all active:scale-95 hover:rotate-180 duration-300"
+                title="Swap locations"
               >
-                <ArrowUpDown size={16} />
+                <ArrowUpDown size={14} strokeWidth={2.5} />
               </button>
             </div>
 
-            {/* Destination Location Input */}
+            {/* Destination Input */}
             <LocationInput
-              id="dest-input"
-              label="Destination (Arrival)"
-              placeholder="Search stop, address, landmark, or pick on map"
+              id="destination-point"
+              iconType="destination"
+              placeholder="Destination (Arrival)"
               value={destination}
               coords={destCoords}
               sourceType={destType}
-              iconType="destination"
               onChange={handleDestChange}
             />
           </div>
 
-          {/* Preferences Section: Sort By + Gender Toggle */}
-          <div className="pt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <SortToggle sortBy={sortBy} onChange={setSortBy} />
-            <GenderToggle gender={gender} onChange={setGender} />
+          {/* Options / Segmented Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Route Preference */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-400 tracking-wider uppercase ml-1">
+                Route Preference
+              </label>
+              <div className="bg-slate-100/80 p-1.5 rounded-2xl flex border border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSortBy('cost')}
+                  className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-xl transition-all ${
+                    sortBy === 'cost'
+                      ? 'bg-white text-slate-800 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)]'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  ₹ Lowest Cost
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('time')}
+                  className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-xl transition-all ${
+                    sortBy === 'time'
+                      ? 'bg-white text-slate-800 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)]'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  ⏱ Least Time
+                </button>
+              </div>
+            </div>
+
+            {/* Commuter Profile */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-400 tracking-wider uppercase ml-1 flex justify-between items-center">
+                <span>Commuter Profile</span>
+                <span className="text-[10px] text-rose-500 font-medium capitalize bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                  Women Free Scheme
+                </span>
+              </label>
+              <div className="bg-slate-100/80 p-1.5 rounded-2xl flex border border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setGender('male')}
+                  className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-xl transition-all ${
+                    gender === 'male'
+                      ? 'bg-white text-slate-800 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)]'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  General
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGender('female')}
+                  className={`flex-1 py-2.5 px-4 text-sm font-semibold rounded-xl transition-all ${
+                    gender === 'female'
+                      ? 'bg-white text-rose-700 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)]'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  Female <span className="opacity-70 font-normal">(₹0 MTC)</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Prominent Action Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-900 via-brand-800 to-rose-700 hover:from-brand-950 hover:to-brand-800 text-white font-bold text-base shadow-soft-lg hover:shadow-soft-xl transition-all duration-200 flex items-center justify-center gap-2.5 group"
-            >
-              <Search size={20} className="group-hover:scale-110 transition-transform" />
-              <span>Search Transit Routes</span>
-              <Compass size={18} className="text-rose-300 opacity-80" />
-            </button>
-          </div>
-        </div>
-      </form>
-
-      {/* Popular Chennai Commutes Quick Chips */}
-      <div className="mt-6 flex flex-wrap items-center gap-2 justify-center">
-        <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-          <Sparkles size={12} className="text-brand-600" />
-          Verified Corridors:
-        </span>
-        {POPULAR_ROUTES.map((route, idx) => (
+          {/* CTA Button - Active only when both locations have valid selections and coordinates */}
           <button
-            key={idx}
-            type="button"
-            onClick={() => selectPopularRoute(route.source, route.destination)}
-            className="text-xs font-medium bg-white/80 hover:bg-rose-50 border border-rose-100/80 hover:border-brand-200 text-slate-700 hover:text-brand-900 px-3 py-1.5 rounded-full transition-all shadow-sm"
+            type="submit"
+            disabled={!isFormValid}
+            className={`w-full rounded-2xl py-4 flex items-center justify-center gap-2 transition-all font-bold text-lg shadow-lg ${
+              isFormValid
+                ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-rose-700/25 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer group'
+                : 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed opacity-90'
+            }`}
           >
-            {route.source} ➔ {route.destination}
+            <Search size={22} className={isFormValid ? 'group-hover:scale-110 transition-transform' : ''} />
+            <span>Search Transit Routes</span>
           </button>
-        ))}
+        </form>
+      </div>
+
+      {/* Footer / Popular Corridors */}
+      <div className="mt-12 text-center w-full max-w-3xl">
+        <div className="flex items-center justify-center gap-2 text-slate-400 mb-6">
+          <div className="h-px bg-slate-200 w-12" />
+          <span className="text-xs font-semibold uppercase tracking-widest">
+            Popular Verified Corridors
+          </span>
+          <div className="h-px bg-slate-200 w-12" />
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-3">
+          {[
+            { source: 'Central Dental College', destination: 'Guindy B.T' },
+            { source: '12Th Main Road Anna Nagar', destination: 'Guindy B.T' },
+            { source: 'Adyar Aavin', destination: 'Guindy Cipet' },
+          ].map((route, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => selectPopularRoute(route.source, route.destination)}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 px-4 py-2.5 rounded-full text-sm font-medium text-slate-600 hover:text-slate-900 shadow-sm hover:shadow transition-all group"
+            >
+              <Navigation size={14} className="text-slate-400 group-hover:text-rose-500" />
+              <span>
+                {route.source} → {route.destination}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

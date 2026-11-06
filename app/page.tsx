@@ -1,59 +1,56 @@
 import React from 'react';
 import { SearchForm } from '@/components/SearchForm';
 import {
-  Train,
-  Bus,
   Sparkles,
-  ShieldCheck,
-  Zap,
   TrendingDown,
+  ShieldCheck,
+  Bus,
+  Train,
+  Zap,
   Footprints,
 } from 'lucide-react';
 
 export default function HomePage() {
   return (
-    <div className="relative overflow-hidden">
-      {/* Decorative Gradient Blobs */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-rose-100/60 via-rose-50/20 to-transparent pointer-events-none -z-10 blur-3xl" />
-      <div className="absolute top-20 right-10 w-72 h-72 bg-brand-100/40 rounded-full blur-2xl pointer-events-none -z-10" />
-      <div className="absolute top-40 left-10 w-72 h-72 bg-pink-100/50 rounded-full blur-2xl pointer-events-none -z-10" />
+    <div className="min-h-screen bg-[#F8F9FA] font-sans text-slate-800 selection:bg-rose-100 selection:text-rose-900 flex flex-col relative overflow-hidden">
+      {/* Decorative ambient background blur */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-rose-200/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[20%] right-[-5%] w-[30%] h-[40%] bg-blue-200/20 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+      {/* Main Layout */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 pt-12 pb-24 relative z-10">
         {/* Hero Section */}
         <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-brand-900 text-xs font-semibold mb-6 shadow-soft-sm">
-            <Sparkles size={14} className="text-brand-600" />
+          {/* Provenance Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-rose-800 text-xs font-semibold mb-6 shadow-sm">
+            <Sparkles size={14} className="text-rose-600" />
             <span>Theme7 Verified Chennai Transit Datasets</span>
           </div>
 
           {/* Heading */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-5">
-            Compare Public Transit in{' '}
-            <span className="bg-gradient-to-r from-brand-900 via-brand-700 to-rose-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.1] mb-5">
+            Seamless Transit in{' '}
+            <span className="bg-gradient-to-r from-rose-800 via-rose-700 to-rose-600 bg-clip-text text-transparent">
               Chennai
             </span>
-            . Real Data & Fares.
           </h1>
 
-          <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
+          <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto font-medium">
             Find connected routes across <span className="font-semibold text-slate-800">MTC Buses</span>,{' '}
             <span className="font-semibold text-slate-800">Chennai Metro (CMRL)</span>, and{' '}
             <span className="font-semibold text-slate-800">Suburban Railway</span> with official stage fares and statutory women free travel rules.
           </p>
         </div>
 
-        {/* Central Search Card (Page 1 Core) */}
-        <div className="max-w-3xl mx-auto mb-16">
-          <SearchForm />
-        </div>
+        {/* Central Search Card & Popular Corridors */}
+        <SearchForm />
 
         {/* Value Highlights Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mt-16 mb-14 w-full">
           {/* Highlight 1: Vidiyal Scheme */}
-          <div className="bg-white/90 backdrop-blur-sm p-6 rounded-3xl border border-rose-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-brand-800 flex items-center justify-center mb-4 border border-rose-200 shadow-inner">
-              <Sparkles size={24} className="text-brand-700" />
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center mb-4 border border-rose-200 shadow-inner">
+              <Sparkles size={24} className="text-rose-700" />
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-1">
               Vidiyal Payana Thittam
@@ -64,7 +61,7 @@ export default function HomePage() {
           </div>
 
           {/* Highlight 2: Cost & Time Optimization */}
-          <div className="bg-white/90 backdrop-blur-sm p-6 rounded-3xl border border-rose-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-800 flex items-center justify-center mb-4 border border-sky-200 shadow-inner">
               <TrendingDown size={24} className="text-sky-700" />
             </div>
@@ -77,7 +74,7 @@ export default function HomePage() {
           </div>
 
           {/* Highlight 3: Transparent Data */}
-          <div className="bg-white/90 backdrop-blur-sm p-6 rounded-3xl border border-rose-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-800 flex items-center justify-center mb-4 border border-emerald-200 shadow-inner">
               <ShieldCheck size={24} className="text-emerald-700" />
             </div>
@@ -91,26 +88,26 @@ export default function HomePage() {
         </div>
 
         {/* Transit Modes Supported Row */}
-        <div className="mt-14 pt-8 border-t border-rose-100/70 text-center">
+        <div className="pt-8 border-t border-slate-200 text-center w-full max-w-4xl mx-auto">
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
             Supported Public Transit Network
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-semibold text-slate-700">
-            <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <span className="flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full border border-slate-200 shadow-sm">
               <Bus size={15} className="text-orange-600" /> MTC Bus Network
             </span>
-            <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <span className="flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full border border-slate-200 shadow-sm">
               <Train size={15} className="text-sky-600" /> Chennai Metro Rail
             </span>
-            <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <span className="flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full border border-slate-200 shadow-sm">
               <Zap size={15} className="text-indigo-600" /> Suburban Rail
             </span>
-            <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <span className="flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full border border-slate-200 shadow-sm">
               <Footprints size={15} className="text-slate-600" /> Walking Transfers
             </span>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
