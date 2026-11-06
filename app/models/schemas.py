@@ -101,6 +101,9 @@ class RouteLeg(BaseModel):
     distance_meters: int
     fare: float
     fare_note: Optional[str] = None
+    fare_status: Optional[str] = None
+    fare_effective_date: Optional[str] = None
+    stage_count: Optional[int] = None
     is_estimated: bool = False
     is_verified: bool = False
     provenance: Optional[str] = None
@@ -119,6 +122,7 @@ class RouteOption(BaseModel):
     is_fastest: bool = False
     is_verified: bool = False
     provenance: Optional[str] = None
+    fare_status: Optional[str] = None
     legs: List[RouteLeg]
 
 class SearchRequest(BaseModel):
@@ -135,6 +139,8 @@ class SearchRequest(BaseModel):
     )
     departure_time: Optional[str] = None
     sort_by: Optional[str] = "cheapest"
+    service_type: Optional[str] = None
+    stage: Optional[int] = None
 
 class SearchResponse(BaseModel):
     search_id: str

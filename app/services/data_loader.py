@@ -152,6 +152,66 @@ def read_kml_suburban_stations(kml_path: str) -> List[Dict[str, Any]]:
         print(f"Error reading KML {kml_path}: {e}")
     return stations
 
+THEME7_METRO_STATION_MAP = {
+    # Blue Line (Corridor 1)
+    "metro_stn_18": "WIMCO NAGAR DEPOT",
+    "metro_stn_19": "WIMCONAGAR",
+    "metro_stn_20": "THIRUVOTRIYUR",
+    "metro_stn_21": "THIRUVOTRIYUR THERADI METRO",
+    "metro_stn_22": "KALADIPET",
+    "metro_stn_23": "TOLLGATE",
+    "metro_stn_24": "NEW WASHERMENPET",
+    "metro_stn_25": "TONDIARPET",
+    "metro_stn_26": "THYAGARAYA COLLEGE",
+    "metro_stn_27": "WASHERMENPET",
+    "metro_stn_28": "MANNADI",
+    "metro_stn_29": "HIGH COURT",
+    "metro_stn_30": "GOVERNMENT ESTATE",
+    "metro_stn_31": "LIC",
+    "metro_stn_32": "THOUSAND LIGHT",
+    "metro_stn_33": "AG-DMS",
+    "metro_stn_34": "TEYNAMPET",
+    "metro_stn_35": "NANDANAM",
+    "metro_stn_36": "SAIDAPET",
+    "metro_stn_37": "LITTLE MOUNT",
+    "metro_stn_38": "GUINDY",
+    "metro_stn_39": "OTA - NANGANALLUR ROAD",
+    "metro_stn_40": "MEENAMBAKKAM",
+    "metro_stn_41": "AIRPORT",
+
+    # Green Line (Corridor 2)
+    "metro_stn_17": "PURATCHI THALAIVAR DR.M.G.RAMACHANDRAN CENTRAL METRO",
+    "metro_stn_7": "EGMORE",
+    "metro_stn_8": "NEHRU PARK",
+    "metro_stn_9": "KILPAUK",
+    "metro_stn_2": "PACHIAPPAS COLLEGE",
+    "metro_stn_3": "SHENOY NAGAR",
+    "metro_stn_4": "ANNA NAGAR EAST",
+    "metro_stn_5": "ANNA NAGAR TOWER",
+    "metro_stn_6": "THIRUMANGALAM",
+    "metro_stn_14": "KOYAMBEDU",
+    "metro_stn_13": "PURATCHI THALAIVI DR.J.JAYALALITHA CMBT METRO",
+    "metro_stn_12": "ARUMBAKKAM",
+    "metro_stn_1": "VADAPALANI",
+    "metro_stn_11": "ASHOK NAGAR",
+    "metro_stn_10": "EKKATTUTHANGAL",
+    "metro_stn_16": "ARIGNAR ANNA ALANDUR METRO",
+    "metro_stn_15": "ST. THOMAS MOUNT",
+
+    # Corridor 4 (Poonamallee line)
+    "metro_stn_42": "POONAMALLEE BYPASS METRO",
+    "metro_stn_43": "POONAMALLEE BUS STAND METRO",
+    "metro_stn_44": "POONAMALLEE GOVERNMENT HOSPITAL METRO",
+    "metro_stn_45": "KARAYANCHAVADI METRO",
+    "metro_stn_46": "KUMANANCHAVADI METRO",
+    "metro_stn_47": "KATTUPAKKAM METRO",
+    "metro_stn_48": "IYYAPANTHANGAL METRO",
+    "metro_stn_49": "THELLIYARAGARAM METRO",
+    "metro_stn_50": "PORUR BYPASS METRO",
+    "metro_stn_51": "PORUR JN METRO",
+}
+
+
 class TransitDataLoader:
     _instance = None
 
@@ -242,11 +302,15 @@ class TransitDataLoader:
             geom = s_pts[i]
             attr = s_attr[i]
             if geom["type"] == "point":
+                stn_id = f"metro_stn_{i+1}"
                 raw_name = attr.get("Name", f"Phase 1 Stations {i+1}")
+                cmrl_name = THEME7_METRO_STATION_MAP.get(stn_id)
+                display_name = f"Theme7 Metro Station: {cmrl_name.title()}" if cmrl_name else f"Theme7 Metro Station: {raw_name}"
                 m_stns.append({
-                    "id": f"metro_stn_{i+1}",
-                    "name": f"Theme7 Metro Station: {raw_name}",
+                    "id": stn_id,
+                    "name": display_name,
                     "raw_name": raw_name,
+                    "cmrl_name": cmrl_name,
                     "lat": geom["point"][0],
                     "lng": geom["point"][1],
                     "category": "metro_station",
@@ -347,6 +411,7 @@ class TransitDataLoader:
 
         # B. Theme7 Metro Stations
         for ms in self.metro_stations:
+            cmrl_title = ms.get("cmrl_name", "").title()
             index.append({
                 "id": ms["id"],
                 "name": ms["name"],
@@ -356,7 +421,7 @@ class TransitDataLoader:
                 "source": ms["source"],
                 "provenance": "Theme7 dataset — Operational_Metro_Stns shapefile (organization-provided)",
                 "is_verified": True,
-                "description": "CMRL Metro Station (Phase 1/2)",
+                "description": f"CMRL Metro Station ({cmrl_title})" if cmrl_title else "CMRL Metro Station (Phase 1/2)",
             })
 
         # C. Theme7 Suburban Stations

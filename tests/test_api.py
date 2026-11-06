@@ -52,11 +52,13 @@ def test_places_search_theme7():
 
 
 def test_route_search_connected_bus_female_free():
-    # Central to Guindy (traverses actual MTC Anna Salai corridor lines)
+    # Central to Guindy on Ordinary Services at known stage 5
     payload = {
         "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
         "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
         "gender": "female",
+        "service_type": "Ordinary Services",
+        "stage": 5,
         "allowed_modes": ["bus", "walking"],
         "departure_time": "2026-11-06T09:00:00",
         "sort_by": "cheapest"
@@ -81,13 +83,19 @@ def test_route_search_connected_bus_female_free():
     # Verify female commuter travels free under Vidiyal Payana Thittam
     assert bus_leg["fare"] == 0.0
     assert "Vidiyal Payana Thittam" in bus_leg["fare_note"]
+    assert bus_leg["fare_status"] == "free_scheme"
+    assert bus_leg["is_verified"] is True
+    assert bus_leg["bus_type"] == "Ordinary Services"
 
 
 def test_route_search_connected_bus_male_charged():
+    # Central to Guindy on Ordinary Services at known stage 5 for male commuter
     payload = {
         "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
         "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
         "gender": "male",
+        "service_type": "Ordinary Services",
+        "stage": 5,
         "allowed_modes": ["bus"],
         "departure_time": "2026-11-06T09:00:00",
     }
@@ -97,7 +105,10 @@ def test_route_search_connected_bus_male_charged():
     assert len(data["routes"]) > 0
     first_route = data["routes"][0]
     bus_leg = next(leg for leg in first_route["legs"] if leg["mode"] == "bus")
-    assert bus_leg["fare"] > 0.0
+    assert bus_leg["fare"] == 9.0  # Exact Stage 5 Ordinary fare
+    assert bus_leg["fare_status"] == "verified"
+    assert bus_leg["is_verified"] is True
+    assert bus_leg["bus_type"] == "Ordinary Services"
 
 
 def test_disconnected_points_return_empty_no_fabrication():
@@ -1070,3 +1081,426 @@ class TestResponseSchemaShape:
             leg = d["routes"][0]["legs"][0]
             for field in ("mode", "from_name", "to_name", "duration_minutes", "distance_meters", "fare"):
                 assert field in leg, f"RouteLeg missing field: {field}"
+
+
+# ===========================================================================
+# Stage B — Unit tests: MTC Stage-Wise Bus Fare Table (Fares_By_Stage)
+# ===========================================================================
+
+from app.services.fare_service import FareService, MTC_SOURCE_URL, MTC_EFFECTIVE_DATE
+
+
+class TestMTCStageFares:
+    """
+    Unit tests for the official MTC Fares_By_Stage lookup engine.
+    Tests all 11 service types, boundary limits, gender rules, and invalid cases.
+    """
+
+    def test_all_11_service_types_supported(self):
+        """Verify that all 11 official service types from mtc_fares.json are listed and resolvable."""
+        types = FareService.get_supported_service_types()
+        assert len(types) == 11
+        expected_types = [
+            "Ordinary Services",
+            "Express Services",
+            "Deluxe Services",
+            "Small",
+            "Night services",
+            "E/V Deluxe Service",
+            "E/V A/C Service",
+            "Chennai Ula Vintage Services",
+            "Pink Services",
+            "Chennai Ula A/C Services",
+            "Premium Services",
+        ]
+        for t in expected_types:
+            assert t in types
+            assert FareService.normalize_service_type(t) == t
+
+    def test_stage_1_fares_for_all_11_types(self):
+        """Verify Stage 1 base fare lookup for every service type."""
+        expected_stage_1 = {
+            "Ordinary Services": 5.0,
+            "Express Services": 7.0,
+            "Deluxe Services": 11.0,
+            "Small": 7.0,
+            "Night services": 11.0,
+            "E/V Deluxe Service": 11.0,
+            "E/V A/C Service": 15.0,
+            "Chennai Ula Vintage Services": 11.0,
+            "Pink Services": 5.0,
+            "Chennai Ula A/C Services": 15.0,
+            "Premium Services": 50.0,
+        }
+        for stype, expected_fare in expected_stage_1.items():
+            fare, note, is_ver, prov = FareService.calculate_mtc_bus_fare_by_stage(
+                stage=1, service_type=stype, gender="male"
+            )
+            assert fare == expected_fare, f"Mismatch for {stype} at Stage 1"
+            assert is_ver is True
+            assert MTC_EFFECTIVE_DATE in prov
+            assert MTC_SOURCE_URL in prov
+
+    def test_stage_30_max_fares(self):
+        """Verify Stage 30 max fares for standard 30-stage services."""
+        # Deluxe Services stage 30 is ₹49
+        fare, _, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(30, "Deluxe Services")
+        assert fare == 49.0
+        assert is_ver is True
+
+        # E/V A/C Service stage 30 is ₹80
+        fare, _, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(30, "E/V A/C Service")
+        assert fare == 80.0
+        assert is_ver is True
+
+        # Ordinary Services stage 30 is ₹24
+        fare, _, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(30, "Ordinary Services", gender="male")
+        assert fare == 24.0
+        assert is_ver is True
+
+    def test_premium_services_stages_1_to_5_and_out_of_range(self):
+        """Premium Services operates only for stages 1 to 5 (₹50 to ₹150). Stage 6+ must be rejected."""
+        premium_fares = {1: 50.0, 2: 75.0, 3: 100.0, 4: 125.0, 5: 150.0}
+        for stg, expected in premium_fares.items():
+            fare, _, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(stg, "Premium Services")
+            assert fare == expected
+            assert is_ver is True
+
+        # Stage 6 must be unavailable for Premium Services
+        fare_6, note_6, is_ver_6, prov_6 = FareService.calculate_mtc_bus_fare_by_stage(6, "Premium Services")
+        assert fare_6 == 0.0
+        assert is_ver_6 is False
+        assert "operates only for stages 1 to 5" in note_6
+        assert "out of range" in prov_6
+
+    def test_stage_boundary_limits_and_invalid_stages(self):
+        """Test stage <= 0, stage > 30, and None."""
+        # Stage 0
+        fare, note, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(0, "Ordinary Services")
+        assert fare == 0.0
+        assert is_ver is False
+        assert "missing or invalid stage" in note
+
+        # Negative stage
+        fare, note, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(-3, "Express Services")
+        assert fare == 0.0
+        assert is_ver is False
+
+        # None stage
+        fare, note, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(None, "Deluxe Services")
+        assert fare == 0.0
+        assert is_ver is False
+
+        # Stage 31 (exceeds table max)
+        fare, note, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(31, "Express Services")
+        assert fare == 0.0
+        assert is_ver is False
+        assert "exceeds maximum defined MTC stage table limit" in note
+
+    def test_unknown_service_type_handling(self):
+        """Unknown service types must return fare=0.0 and is_verified=False."""
+        fare, note, is_ver, _ = FareService.calculate_mtc_bus_fare_by_stage(1, "Flying Bus")
+        assert fare == 0.0
+        assert is_ver is False
+        assert "unknown MTC service type" in note
+
+    def test_womens_free_travel_strictly_ordinary_services(self):
+        """
+        Vidiyal Payana Thittam free travel applies strictly to Ordinary Services.
+        Pink Services, Express, Deluxe, and A/C must charge normal fare for females
+        until official eligibility is independently verified.
+        """
+        # Female on Ordinary Services -> Free (₹0.0)
+        fare, note, is_ver, prov = FareService.calculate_mtc_bus_fare_by_stage(
+            stage=5, service_type="Ordinary Services", gender="female"
+        )
+        assert fare == 0.0
+        assert is_ver is True
+        assert "Vidiyal Payana Thittam" in note
+        assert "Vidiyal Payana Thittam" in prov
+
+        # Female on Pink Services -> Must charge official Stage 5 fare (₹9.0), NOT ₹0.0
+        fare_pink, _, is_ver_pink, _ = FareService.calculate_mtc_bus_fare_by_stage(
+            stage=5, service_type="Pink Services", gender="female"
+        )
+        assert fare_pink == 9.0
+        assert is_ver_pink is True
+
+        # Female on Express Services -> Must charge official Stage 5 fare (₹13.0)
+        fare_exp, _, is_ver_exp, _ = FareService.calculate_mtc_bus_fare_by_stage(
+            stage=5, service_type="Express Services", gender="female"
+        )
+        assert fare_exp == 13.0
+        assert is_ver_exp is True
+
+        # Female on Deluxe Services -> Must charge official Stage 5 fare (₹19.0)
+        fare_dlx, _, is_ver_dlx, _ = FareService.calculate_mtc_bus_fare_by_stage(
+            stage=5, service_type="Deluxe Services", gender="female"
+        )
+        assert fare_dlx == 19.0
+        assert is_ver_dlx is True
+
+        # Male on Ordinary Services -> Must pay official Stage 5 fare (₹9.0)
+        fare_male, _, is_ver_male, _ = FareService.calculate_mtc_bus_fare_by_stage(
+            stage=5, service_type="Ordinary Services", gender="male"
+        )
+        assert fare_male == 9.0
+        assert is_ver_male is True
+
+    def test_service_type_aliases_and_case_insensitivity(self):
+        """Verify common normalized aliases resolve correctly."""
+        # 'deluxe' resolves to Deluxe Services
+        f1, _, _, _ = FareService.calculate_mtc_bus_fare_by_stage(1, "deluxe")
+        assert f1 == 11.0
+
+        # 'ac' / 'ev_ac' resolves to E/V A/C Service
+        f2, _, _, _ = FareService.calculate_mtc_bus_fare_by_stage(1, "ac")
+        assert f2 == 15.0
+
+        # 'small' resolves to Small
+        f3, _, _, _ = FareService.calculate_mtc_bus_fare_by_stage(1, "small")
+        assert f3 == 7.0
+
+
+    def test_route_search_unknown_stage_fare_unavailable(self):
+        """
+        When stage number is not explicitly available, routing engine must NOT fabricate
+        a stage fare or assume distance/km slabs. It must mark fare as unavailable.
+        """
+        payload = {
+            "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
+            "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
+            "gender": "male",
+            "service_type": "Express Services",
+            # stage is omitted
+            "allowed_modes": ["bus"],
+        }
+        resp = client.post("/api/v1/routes/search", json=payload)
+        assert resp.status_code == 200
+        routes = resp.json()["routes"]
+        assert len(routes) > 0
+        bus_leg = next(leg for leg in routes[0]["legs"] if leg["mode"] == "bus")
+        assert bus_leg["fare"] == 0.0
+        assert bus_leg["fare_status"] == "unavailable"
+        assert bus_leg["is_verified"] is False
+        assert "stage number not established" in bus_leg["fare_note"]
+        assert "Theme7 dataset lacks stop-to-stage sequence mapping" in bus_leg["provenance"]
+
+    def test_route_search_unknown_service_type_unavailable(self):
+        """
+        When service type is unknown, routing engine must NOT assume Ordinary Services.
+        It must mark bus_type as 'unknown' and fare as unavailable.
+        """
+        payload = {
+            "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
+            "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
+            "gender": "male",
+            "stage": 5,
+            # service_type is omitted
+            "allowed_modes": ["bus"],
+        }
+        resp = client.post("/api/v1/routes/search", json=payload)
+        assert resp.status_code == 200
+        routes = resp.json()["routes"]
+        assert len(routes) > 0
+        bus_leg = next(leg for leg in routes[0]["legs"] if leg["mode"] == "bus")
+        assert bus_leg["fare"] == 0.0
+        assert bus_leg["bus_type"] == "unknown"
+        assert bus_leg["fare_status"] == "unavailable"
+        assert bus_leg["is_verified"] is False
+        assert "service type is unknown" in bus_leg["fare_note"]
+
+    def test_route_search_express_deluxe_ac_fares(self):
+        """
+        Verify exact stage lookups on route search for non-ordinary service types:
+        Express, Deluxe, and E/V A/C Services, ensuring females are charged standard tariff.
+        """
+        # 1. Express Services Stage 4 for female commuter -> ₹12.0 (not free)
+        payload_express = {
+            "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
+            "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
+            "gender": "female",
+            "service_type": "Express Services",
+            "stage": 4,
+            "allowed_modes": ["bus"],
+        }
+        resp_exp = client.post("/api/v1/routes/search", json=payload_express)
+        assert resp_exp.status_code == 200
+        bus_exp = next(leg for leg in resp_exp.json()["routes"][0]["legs"] if leg["mode"] == "bus")
+        assert bus_exp["fare"] == 12.0
+        assert bus_exp["fare_status"] == "verified"
+        assert bus_exp["is_verified"] is True
+        assert bus_exp["bus_type"] == "Express Services"
+
+        # 2. Deluxe Services Stage 3 for male commuter -> ₹15.0
+        payload_deluxe = {
+            "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
+            "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
+            "gender": "male",
+            "service_type": "Deluxe Services",
+            "stage": 3,
+            "allowed_modes": ["bus"],
+        }
+        resp_dlx = client.post("/api/v1/routes/search", json=payload_deluxe)
+        assert resp_dlx.status_code == 200
+        bus_dlx = next(leg for leg in resp_dlx.json()["routes"][0]["legs"] if leg["mode"] == "bus")
+        assert bus_dlx["fare"] == 15.0
+        assert bus_dlx["fare_status"] == "verified"
+        assert bus_dlx["is_verified"] is True
+        assert bus_dlx["bus_type"] == "Deluxe Services"
+
+        # 3. E/V A/C Service Stage 6 for female commuter -> ₹30.0
+        payload_ac = {
+            "origin": {"lat": 13.0827, "lng": 80.2755, "name": "Central Area"},
+            "destination": {"lat": 13.0067, "lng": 80.2128, "name": "Guindy Area"},
+            "gender": "female",
+            "service_type": "E/V A/C Service",
+            "stage": 6,
+            "allowed_modes": ["bus"],
+        }
+        resp_ac = client.post("/api/v1/routes/search", json=payload_ac)
+        assert resp_ac.status_code == 200
+        bus_ac = next(leg for leg in resp_ac.json()["routes"][0]["legs"] if leg["mode"] == "bus")
+        assert bus_ac["fare"] == 30.0
+        assert bus_ac["fare_status"] == "verified"
+        assert bus_ac["is_verified"] is True
+        assert bus_ac["bus_type"] == "E/V A/C Service"
+
+
+class TestMultimodalRoutingAndMetroFares:
+    """
+    Verification tests for Chennai Metro station-to-station fare matrix,
+    line interchange routing, and multimodal journey combinations.
+    """
+
+    def test_cmrl_fare_matrix_exact_lookups(self):
+        """Verify exact station-to-station lookups from CMRL Fare Table."""
+        # Mannadi to Egmore -> ₹20
+        f1, note1, is_v1, prov1, st1 = FareService.calculate_metro_fare_by_station("MANNADI", "EGMORE")
+        assert f1 == 20.0
+        assert is_v1 is True
+        assert st1 == "verified"
+        assert "₹20" in note1
+        assert "Official CMRL" in prov1
+
+        # Airport to Central -> ₹40
+        f2, _, is_v2, _, st2 = FareService.calculate_metro_fare_by_station("AIRPORT", "PURATCHI THALAIVAR DR.M.G.RAMACHANDRAN CENTRAL METRO")
+        assert f2 == 40.0
+        assert is_v2 is True
+        assert st2 == "verified"
+
+        # Central to Egmore -> ₹10
+        f3, _, is_v3, _, st3 = FareService.calculate_metro_fare_by_station("PURATCHI THALAIVAR DR.M.G.RAMACHANDRAN CENTRAL METRO", "EGMORE")
+        assert f3 == 10.0
+        assert is_v3 is True
+        assert st3 == "verified"
+
+        # Airport to Wimco Nagar Depot (maximum cross-corridor distance) -> ₹50
+        f4, _, is_v4, _, st4 = FareService.calculate_metro_fare_by_station("AIRPORT", "WIMCO NAGAR DEPOT")
+        assert f4 == 50.0
+        assert is_v4 is True
+        assert st4 == "verified"
+
+        # Diagonal / same station -> ₹10
+        f5, _, is_v5, _, st5 = FareService.calculate_metro_fare_by_station("GUINDY", "GUINDY")
+        assert f5 == 10.0
+        assert is_v5 is True
+        assert st5 == "verified"
+
+    def test_cmrl_station_name_normalization_and_aliases(self):
+        """Verify alias mapping and case insensitivity."""
+        # 'Mannady' alias
+        f1, _, is_v1, _, st1 = FareService.calculate_metro_fare_by_station("mannady", "egmore")
+        assert f1 == 20.0
+        assert is_v1 is True
+
+        # 'Chennai Central' alias
+        f2, _, is_v2, _, st2 = FareService.calculate_metro_fare_by_station("Airport", "Chennai Central")
+        assert f2 == 40.0
+        assert is_v2 is True
+
+        # Prefixed Theme7 string
+        f3, _, is_v3, _, st3 = FareService.calculate_metro_fare_by_station(
+            "Theme7 Metro Station: Mannadi", "Theme7 Metro Station: Egmore"
+        )
+        assert f3 == 20.0
+        assert is_v3 is True
+
+    def test_cmrl_unknown_station_returns_unavailable_without_guessing(self):
+        """When station cannot be mapped, fare must be explicitly unavailable."""
+        f, note, is_v, _, st = FareService.calculate_metro_fare_by_station("UnknownStationXYZ", "EGMORE")
+        assert f == 0.0
+        assert is_v is False
+        assert st == "unavailable"
+        assert "unmapped station" in note
+
+    def test_mannady_to_egmore_returns_metro_journey(self):
+        """
+        Crucial benchmark: Searching Mannady Metro -> Egmore MUST discover
+        the Chennai Metro journey with interchange at Central Metro,
+        reporting exact ₹20 fare and fastest ETA.
+        """
+        payload = {
+            "origin": {"lat": 13.095547, "lng": 80.286137, "name": "Mannady Metro"},
+            "destination": {"lat": 13.078973, "lng": 80.260869, "name": "Egmore"},
+            "gender": "female",
+            "allowed_modes": ["bus", "metro", "walking"],
+        }
+        resp = client.post("/api/v1/routes/search", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        routes = data["routes"]
+        assert len(routes) > 0
+
+        # Must have a genuine Metro journey option
+        metro_routes = [r for r in routes if "Chennai Metro" in r["summary"]]
+        assert len(metro_routes) >= 1
+        m_route = metro_routes[0]
+
+        # Verify Metro route characteristics
+        assert m_route["total_fare"] == 20.0
+        assert m_route["fare_status"] == "verified"
+        assert m_route["is_verified"] is True
+        assert m_route["transfers_count"] == 2  # 1 entry, 1 interchange
+        assert "Central" in m_route["summary"]
+
+        # Verify legs structure
+        legs = m_route["legs"]
+        assert len(legs) == 5  # Walk1 -> Metro1 -> TransferWalk -> Metro2 -> Walk2
+        assert legs[0]["mode"] == "walking"
+        assert legs[0]["fare"] == 0.0
+        assert legs[1]["mode"] == "metro"
+        assert legs[1]["fare"] == 20.0
+        assert legs[1]["fare_status"] == "verified"
+        assert legs[2]["mode"] == "walking"
+        assert legs[2]["fare"] == 0.0
+        assert legs[3]["mode"] == "metro"
+        assert legs[3]["fare"] == 0.0
+        assert legs[4]["mode"] == "walking"
+        assert legs[4]["fare"] == 0.0
+
+    def test_mannady_to_egmore_returns_multimodal_combinations(self):
+        """
+        Searching Mannady Metro -> Egmore must return both direct bus options,
+        the Metro journey, and multimodal transfer combinations.
+        """
+        payload = {
+            "origin": {"lat": 13.095547, "lng": 80.286137, "name": "Mannady Metro"},
+            "destination": {"lat": 13.078973, "lng": 80.260869, "name": "Egmore"},
+            "gender": "female",
+            "allowed_modes": ["bus", "metro", "walking"],
+        }
+        resp = client.post("/api/v1/routes/search", json=payload)
+        assert resp.status_code == 200
+        routes = resp.json()["routes"]
+
+        # Check multimodal combo presence
+        combo_routes = [r for r in routes if "Multimodal Combo" in r["summary"]]
+        assert len(combo_routes) >= 1
+
+        # Check that walking legs are ₹0 and distinct from unavailable fares
+        for r in routes:
+            for leg in r["legs"]:
+                if leg["mode"] == "walking":
+                    assert leg["fare"] == 0.0
+                    assert leg["fare_status"] == "zero_fare"
